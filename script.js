@@ -1,840 +1,60 @@
+"use strict";
+
+// ==========================================
+// CONFIGURACIÓN GENERAL
+// ==========================================
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const scoreElement = document.getElementById("score");
-const remainingElement = document.getElementById("remaining");
-const startMessage = document.getElementById("startMessage");
+const statusElement = document.getElementById("status");
 const startButton = document.getElementById("startButton");
 const restartButton = document.getElementById("restartButton");
 const musicButton = document.getElementById("musicButton");
+const startOverlay = document.getElementById("startOverlay");
 
-const W = 320;
-const H = 180;
-const TOTAL = 25;
+const backgroundMusic = document.getElementById("backgroundMusic");
+const screamerAudio = document.getElementById("screamerAudio");
+
+const W = canvas.width;
+const H = canvas.height;
+const TOTAL_CREATURES = 25;
+
+const rand = (min, max) => Math.random() * (max - min) + min;
+const choose = array => array[Math.floor(Math.random() * array.length)];
 
 let creatures = [];
 let score = 0;
-let running = false;
-let animationId = null;
-let lastTime = 0;
-
-let mouse = {
-    x: -100,
-    y: -100,
-    inside: false
-};
-
-let audioContext = null;
+let gameRunning = false;
 let musicEnabled = false;
-let musicNodes = [];
-let masterGain = null;
-
-// Escala y desplazamiento para adaptar el mundo a la ventana.
-let scaleX = 1;
-let scaleY = 1;
-let offsetX = 0;
-let offsetY = 0;
-
-const colors = {
-    ghost: "#e9f4e9",
-    pinkGhost: "#ff9bd5",
-    mint: "#a6ffd1",
-    pumpkin: "#ff9b43",
-    purple: "#bb91ff",
-    zombie: "#a5dc78"
-};
-
-const rand = (min, max) => Math.random() * (max - min) + min;
-const choice = arr => arr[Math.floor(Math.random() * arr.length)];
-
-function rect(x, y, w, h, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(
-        Math.round(x),
-        Math.round(y),
-        Math.max(1, Math.round(w)),
-        Math.max(1, Math.round(h))
-    );
-}
-
-// ================================================
-// AJUSTE RESPONSIVO DEL CANVAS
-// ================================================
-
-function resizeCanvas() {
-    const rectCanvas = canvas.getBoundingClientRect();
-
-    if (rectCanvas.width <= 0 || rectCanvas.height <= 0) return;
-
-    // Resolución interna basada en múltiplos para conservar píxeles.
-    const pixelScale = Math.max(
-        1,
-        Math.floor(Math.min(rectCanvas.width / W, rectCanvas.height / H))
-    );
-
-    // El canvas interno conserva una proporción 16:9.
-    canvas.width = W * pixelScale;
-    canvas.height = H * pixelScale;
-
-    scaleX = canvas.width / W;
-    scaleY = canvas.height / H;
-
-    drawScene();
-}
-
-window.addEventListener("resize", resizeCanvas);
-
-// ================================================
-// FONDO: CEMENTERIO PIXEL ART
-// ================================================
-
-function drawBackground() {
-    rect(0, 0, W, H, "#11142d");
-    rect(0, 0, W, 85, "#171a38");
-    rect(0, 85, W, 55, "#20213a");
-
-    // Luna
-    rect(239, 13, 23, 23, "#b9c8d7");
-    rect(235, 18, 4, 13, "#b9c8d7");
-    rect(244, 9, 13, 4, "#b9c8d7");
-    rect(244, 17, 5, 5, "#8798b2");
-    rect(251, 26, 5, 4, "#8798b2");
-    rect(239, 31, 5, 5, "#8798b2");
-
-    // Estrellas
-    for (let i = 0; i < 35; i++) {
-        const x = (i * 47 + 13) % W;
-        const y = (i * 29 + 7) % 68;
-
-        rect(
-            x,
-            y,
-            i % 4 === 0 ? 2 : 1,
-            i % 4 === 0 ? 2 : 1,
-            i % 3 === 0 ? "#f7d9a1" : "#a7b9e9"
-        );
-    }
-
-    // Nubes
-    rect(22, 24, 31, 5, "#252746");
-    rect(14, 29, 43, 4, "#252746");
-    rect(70, 43, 24, 4, "#222640");
-    rect(63, 47, 35, 4, "#222640");
-    rect(175, 27, 29, 4, "#252746");
-    rect(184, 31, 31, 4, "#252746");
-
-    // Árboles lejanos
-    rect(0, 72, W, 18, "#202a3c");
-
-    for (let x = -5; x < W; x += 19) {
-        rect(x + 6, 48 + (x % 3) * 3, 4, 36, "#111a29");
-        rect(x, 58 + (x % 2) * 4, 16, 17, "#182438");
-        rect(x + 3, 51 + (x % 2) * 3, 10, 14, "#182438");
-        rect(x + 6, 44 + (x % 3), 5, 12, "#182438");
-    }
-
-    // Suelo
-    rect(0, 88, W, 92, "#29283b");
-    rect(0, 91, W, 5, "#3a3948");
-    rect(0, 96, W, 4, "#323246");
-
-    // Camino
-    rect(133, 95, 44, 85, "#454252");
-    rect(141, 95, 29, 85, "#514b58");
-
-    for (let y = 98; y < H; y += 12) {
-        rect(136, y, 7, 1, "#29283b");
-        rect(159, y + 5, 10, 1, "#393547");
-    }
-
-    // Tumbas
-    drawGrave(18, 80, 17, 25, "#77748a", "#47465e");
-    drawGrave(65, 85, 18, 27, "#77748a", "#4c4961");
-    drawGrave(108, 81, 17, 24, "#66667d", "#44445c");
-    drawGrave(202, 83, 19, 27, "#77748a", "#49465e");
-    drawGrave(277, 80, 19, 29, "#858095", "#514a65");
-
-    // Cruces
-    rect(24, 83, 3, 8, "#c5b9a4");
-    rect(21, 85, 9, 3, "#c5b9a4");
-    rect(285, 83, 3, 9, "#d0bfa9");
-    rect(282, 86, 9, 3, "#d0bfa9");
-
-    drawDeadTree(5, 48, 1);
-    drawDeadTree(302, 46, -1);
-
-    // Vallas
-    for (let x = 0; x < 64; x += 9) {
-        rect(x, 112, 3, 18, "#65506d");
-        rect(x - 2, 116, 7, 3, "#87677b");
-    }
-
-    rect(0, 114, 65, 3, "#87677b");
-    rect(0, 125, 65, 3, "#654a68");
-
-    for (let x = 248; x < 320; x += 9) {
-        rect(x, 116, 3, 16, "#65506d");
-        rect(x - 2, 119, 7, 3, "#87677b");
-    }
-
-    rect(247, 117, 73, 3, "#87677b");
-    rect(247, 129, 73, 3, "#654a68");
-
-    drawPumpkin(77, 143, 0.8);
-    drawPumpkin(257, 139, 0.7);
-
-    // Flores
-    for (let i = 0; i < 22; i++) {
-        const x = (i * 53 + 16) % W;
-        const y = 105 + (i * 17) % 69;
-
-        rect(x, y, 2, 5, "#527c54");
-        rect(x - 2, y + 1, 2, 2, "#e49ab8");
-        rect(x + 2, y + 2, 2, 2, "#b8a0ff");
-    }
-
-    // Piedras
-    for (let i = 0; i < 75; i++) {
-        const x = (i * 37 + 9) % W;
-        const y = 97 + (i * 23) % 80;
-
-        rect(x, y, 2, 1, i % 2 ? "#494356" : "#505047");
-    }
-
-    // Niebla
-    rect(0, 105, 42, 4, "#77768b");
-    rect(11, 109, 48, 3, "#53536e");
-    rect(244, 105, 35, 3, "#77768b");
-    rect(269, 108, 42, 4, "#53536e");
-}
-
-function drawGrave(x, y, w, h, front, shadow) {
-    rect(x + 3, y + h, w + 2, 3, "#171827");
-    rect(x + 2, y + 3, w, h - 2, shadow);
-    rect(x, y + 5, w, h - 5, front);
-    rect(x + 2, y + 1, w - 4, 7, front);
-    rect(x + 4, y, w - 8, 3, front);
-    rect(x + 3, y + 7, 2, h - 11, "#aaa0ad");
-    rect(x + 5, y + 11, w - 10, 2, shadow);
-    rect(x + 5, y + 16, w - 10, 2, shadow);
-}
-
-function drawDeadTree(x, y, direction) {
-    rect(x + 4, y + 25, 6, 65, "#382b3a");
-    rect(x + 2, y + 39, 4, 18, "#382b3a");
-    rect(x + 3, y + 26, 3, 4, "#76506b");
-
-    rect(x + 5, y + 30, direction * 17, 4, "#382b3a");
-    rect(x + 5 + direction * 16, y + 19, 3, 15, "#382b3a");
-    rect(x + 5 + direction * 16, y + 17, direction * 8, 3, "#382b3a");
-
-    rect(x + 7, y + 44, direction * 13, 3, "#382b3a");
-    rect(x + 7 + direction * 12, y + 36, 3, 11, "#382b3a");
-    rect(x + 7 + direction * 12, y + 34, direction * 8, 3, "#382b3a");
-}
-
-function drawPumpkin(x, y, scale = 1) {
-    const s = scale;
-
-    rect(x + 4*s, y, 5*s, 3*s, "#59794b");
-    rect(x + 2*s, y + 3*s, 10*s, 8*s, "#d96c35");
-    rect(x, y + 5*s, 14*s, 5*s, "#f18b3c");
-    rect(x + 4*s, y + 4*s, 2*s, 7*s, "#ffb65a");
-    rect(x + 9*s, y + 4*s, 2*s, 7*s, "#b95631");
-    rect(x + 3*s, y + 6*s, 2*s, 2*s, "#42243a");
-    rect(x + 9*s, y + 6*s, 2*s, 2*s, "#42243a");
-    rect(x + 5*s, y + 8*s, 4*s, 2*s, "#42243a");
-}
-
-// ================================================
-// CLASE DE LAS CRIATURAS
-// ================================================
-
-class Creature {
-    constructor() {
-        this.respawn(true);
-    }
-
-    respawn(initial = false) {
-        this.x = rand(12, W - 12);
-        this.y = rand(18, H - 12);
-        this.size = rand(5, 8);
-        this.radius = this.size * 0.7;
-        this.speed = rand(18, 39);
-
-        this.type = choice(["ghost", "pumpkin", "bat", "zombie", "cat"]);
-        this.movement = choice(["up", "down", "diagonal", "circular"]);
-        this.color = choice(Object.values(colors));
-        this.originalColor = this.color;
-
-        this.angle = rand(0, Math.PI * 2);
-        this.phase = rand(0, Math.PI * 2);
-        this.flash = 0;
-        this.squash = 0;
-        this.squashTimer = 0;
-        this.opacity = 1;
-        this.fadeDirection = 0;
-
-        this.dx = rand(-1, 1);
-        this.dy = rand(-1, 1);
-
-        if (this.movement === "up") {
-            this.dx = 0;
-            this.dy = -1;
-        } else if (this.movement === "down") {
-            this.dx = 0;
-            this.dy = 1;
-        } else if (this.movement === "diagonal") {
-            this.dx = Math.random() < 0.5 ? -1 : 1;
-            this.dy = Math.random() < 0.5 ? -1 : 1;
-        }
-
-        const length = Math.hypot(this.dx, this.dy) || 1;
-        this.dx /= length;
-        this.dy /= length;
-    }
-
-    update(dt) {
-        if (this.squash > 0) {
-            this.squashTimer -= dt;
-
-            if (this.squashTimer <= 0) {
-                this.squash = 0;
-                this.respawn();
-            }
-
-            return;
-        }
-
-        this.phase += dt * 4;
-        this.flash = Math.max(0, this.flash - dt);
-
-        const velocity = this.speed * dt;
-
-        if (this.movement === "circular") {
-            this.angle += dt * (1.1 + this.speed / 40);
-            this.x += Math.cos(this.angle) * velocity;
-            this.y += Math.sin(this.angle) * velocity;
-        } else {
-            if (Math.random() < 0.018) {
-                this.dx += rand(-0.25, 0.25);
-                this.dy += rand(-0.25, 0.25);
-
-                const length = Math.hypot(this.dx, this.dy) || 1;
-                this.dx /= length;
-                this.dy /= length;
-            }
-
-            this.x += this.dx * velocity;
-            this.y += this.dy * velocity;
-        }
-
-        // Desaparecer y reaparecer brevemente.
-        if (this.fadeDirection === 0 && Math.random() < 0.0008) {
-            this.fadeDirection = 1;
-        }
-
-        if (this.fadeDirection !== 0) {
-            this.opacity -= this.fadeDirection * dt * 2.5;
-
-            if (this.opacity <= 0) {
-                this.opacity = 0;
-                this.respawn();
-                this.opacity = 0;
-                this.fadeDirection = -1;
-            } else if (this.opacity >= 1) {
-                this.opacity = 1;
-                this.fadeDirection = 0;
-            }
-        }
-
-        const margin = this.size + 2;
-
-        if (this.x < margin) {
-            this.x = margin;
-            this.dx = Math.abs(this.dx);
-            this.flash = 0.12;
-        } else if (this.x > W - margin) {
-            this.x = W - margin;
-            this.dx = -Math.abs(this.dx);
-            this.flash = 0.12;
-        }
-
-        if (this.y < margin + 5) {
-            this.y = margin + 5;
-            this.dy = Math.abs(this.dy);
-            this.flash = 0.12;
-        } else if (this.y > H - margin) {
-            this.y = H - margin;
-            this.dy = -Math.abs(this.dy);
-            this.flash = 0.12;
-        }
-    }
-
-    draw() {
-        if (this.squash > 0) {
-            this.drawSquashed();
-            return;
-        }
-
-        ctx.save();
-        ctx.globalAlpha = this.opacity;
-
-        const x = Math.round(this.x);
-        const y = Math.round(this.y + Math.sin(this.phase) * 1.2);
-        const s = this.size / 10;
-
-        rect(x - 5*s, y + 5*s, 10*s, 2*s, "#10101d");
-
-        if (this.flash > 0) {
-            rect(x - 8*s, y - 8*s, 16*s, 16*s, "#83d9ff");
-            rect(x - 6*s, y - 6*s, 12*s, 12*s, "#d8f6ff");
-        } else {
-            this.drawSprite(x, y, s);
-        }
-
-        ctx.restore();
-    }
-
-    drawSprite(x, y, s) {
-        switch (this.type) {
-            case "ghost":
-                this.drawGhost(x, y, s, this.color);
-                break;
-            case "pumpkin":
-                this.drawPumpkinCreature(x, y, s);
-                break;
-            case "bat":
-                this.drawBat(x, y, s);
-                break;
-            case "zombie":
-                this.drawZombie(x, y, s);
-                break;
-            case "cat":
-                this.drawCat(x, y, s);
-                break;
-        }
-    }
-
-    drawGhost(x, y, s, color) {
-        rect(x - 4*s, y - 6*s, 8*s, 2*s, color);
-        rect(x - 6*s, y - 4*s, 12*s, 8*s, color);
-        rect(x - 5*s, y + 4*s, 3*s, 3*s, color);
-        rect(x, y + 4*s, 3*s, 3*s, color);
-        rect(x + 4*s, y + 3*s, 2*s, 2*s, color);
-
-        rect(x - 5*s, y + 1*s, 2*s, 2*s, "#ff9bbd");
-        rect(x + 3*s, y + 1*s, 2*s, 2*s, "#ff9bbd");
-        rect(x - 3*s, y - 2*s, 2*s, 3*s, "#27243d");
-        rect(x + 2*s, y - 2*s, 2*s, 3*s, "#27243d");
-        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#6e6481");
-    }
-
-    drawPumpkinCreature(x, y, s) {
-        rect(x - 3*s, y - 7*s, 6*s, 3*s, "#648b4f");
-        rect(x - 6*s, y - 5*s, 12*s, 9*s, "#ef8b3b");
-        rect(x - 7*s, y - 2*s, 2*s, 5*s, "#d36b31");
-        rect(x + 5*s, y - 2*s, 2*s, 5*s, "#d36b31");
-        rect(x - 4*s, y - 4*s, 2*s, 7*s, "#ffb35b");
-        rect(x + 2*s, y - 4*s, 2*s, 7*s, "#c96832");
-
-        rect(x - 4*s, y - 1*s, 2*s, 2*s, "#35233b");
-        rect(x + 2*s, y - 1*s, 2*s, 2*s, "#35233b");
-        rect(x - 2*s, y + 2*s, 4*s, 2*s, "#35233b");
-        rect(x - 3*s, y + 5*s, 2*s, 2*s, "#f6a04c");
-        rect(x + 2*s, y + 5*s, 2*s, 2*s, "#f6a04c");
-    }
-
-    drawBat(x, y, s) {
-        rect(x - 3*s, y - 3*s, 6*s, 7*s, this.color);
-        rect(x - 7*s, y - 5*s, 5*s, 3*s, this.color);
-        rect(x - 9*s, y - 7*s, 5*s, 4*s, this.color);
-        rect(x + 2*s, y - 5*s, 5*s, 3*s, this.color);
-        rect(x + 4*s, y - 7*s, 5*s, 4*s, this.color);
-
-        rect(x - 3*s, y + 3*s, 2*s, 3*s, "#b5a0ff");
-        rect(x + 2*s, y + 3*s, 2*s, 3*s, "#b5a0ff");
-        rect(x - 2*s, y - 1*s, 2*s, 2*s, "#fff0b8");
-        rect(x + 1*s, y - 1*s, 2*s, 2*s, "#fff0b8");
-        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#ff83c5");
-    }
-
-    drawZombie(x, y, s) {
-        rect(x - 5*s, y - 6*s, 10*s, 9*s, this.color);
-        rect(x - 4*s, y - 8*s, 8*s, 3*s, "#70594b");
-        rect(x - 6*s, y - 4*s, 2*s, 5*s, "#79b45d");
-        rect(x + 4*s, y - 3*s, 2*s, 4*s, "#79b45d");
-
-        rect(x - 3*s, y - 2*s, 2*s, 2*s, "#34253b");
-        rect(x + 2*s, y - 2*s, 2*s, 2*s, "#34253b");
-        rect(x - 2*s, y + 2*s, 5*s, 2*s, "#f3f0d9");
-        rect(x - 5*s, y + 4*s, 3*s, 3*s, "#8bbd69");
-        rect(x + 2*s, y + 4*s, 3*s, 3*s, "#8bbd69");
-    }
-
-    drawCat(x, y, s) {
-        rect(x - 6*s, y - 5*s, 3*s, 3*s, this.color);
-        rect(x - 5*s, y - 7*s, 3*s, 3*s, this.color);
-        rect(x + 3*s, y - 5*s, 3*s, 3*s, this.color);
-        rect(x + 2*s, y - 7*s, 3*s, 3*s, this.color);
-        rect(x - 6*s, y - 3*s, 12*s, 8*s, this.color);
-        rect(x - 5*s, y + 4*s, 3*s, 3*s, this.color);
-        rect(x + 2*s, y + 4*s, 3*s, 3*s, this.color);
-
-        rect(x - 3*s, y - 1*s, 2*s, 2*s, "#29243b");
-        rect(x + 2*s, y - 1*s, 2*s, 2*s, "#29243b");
-        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#ff9ecb");
-        rect(x - 7*s, y + 1*s, 2*s, 1*s, "#ff9ecb");
-        rect(x + 5*s, y + 1*s, 2*s, 1*s, "#ff9ecb");
-    }
-
-    drawSquashed() {
-        const p = Math.max(0, this.squashTimer / 0.28);
-        const width = this.size * 1.7 * (1.15 - p * 0.15);
-        const height = Math.max(1, this.size * 0.4 * p);
-
-        rect(this.x - width, this.y + 3, width * 2, 2, "#a4efff");
-        rect(this.x - width - 2, this.y + 4, 2, 1, "#f6b4ff");
-        rect(this.x + width, this.y + 4, 2, 1, "#f6b4ff");
-
-        rect(
-            this.x - width,
-            this.y - height,
-            width * 2,
-            Math.max(2, height * 2),
-            "#bdeaff"
-        );
-
-        rect(
-            this.x - width + 2,
-            this.y - height + 1,
-            width * 2 - 4,
-            Math.max(1, height),
-            this.color
-        );
-
-        rect(this.x - 4, this.y - 1, 2, 2, "#27243d");
-        rect(this.x + 2, this.y - 1, 2, 2, "#27243d");
-    }
-
-    containsPoint(x, y) {
-        return (
-            Math.abs(x - this.x) < this.size + 3 &&
-            Math.abs(y - this.y) < this.size + 3 &&
-            this.squash === 0
-        );
-    }
-
-    squashCreature() {
-        this.squash = 1;
-        this.squashTimer = 0.28;
-    }
-
-    bounceFrom(other) {
-        if (this.squash || other.squash) return;
-
-        const dx = other.x - this.x;
-        const dy = other.y - this.y;
-        const distance = Math.hypot(dx, dy);
-        const minDistance = this.radius + other.radius;
-
-        if (distance === 0 || distance >= minDistance) return;
-
-        const nx = dx / distance;
-        const ny = dy / distance;
-        const overlap = minDistance - distance;
-
-        this.x -= nx * overlap / 2;
-        this.y -= ny * overlap / 2;
-        other.x += nx * overlap / 2;
-        other.y += ny * overlap / 2;
-
-        const relativeNormal =
-            (this.dx - other.dx) * nx +
-            (this.dy - other.dy) * ny;
-
-        if (relativeNormal > 0) {
-            this.dx -= relativeNormal * nx;
-            this.dy -= relativeNormal * ny;
-            other.dx += relativeNormal * nx;
-            other.dy += relativeNormal * ny;
-        }
-
-        if (this.movement === "circular") this.angle += Math.PI;
-        if (other.movement === "circular") other.angle += Math.PI;
-
-        this.flash = 0.18;
-        other.flash = 0.18;
-    }
-}
-
-// ================================================
-// CREACIÓN Y CONTADORES
-// ================================================
-
-function createCreatures() {
-    creatures = [];
-
-    for (let i = 0; i < TOTAL; i++) {
-        const creature = new Creature();
-        creatures.push(creature);
-    }
-
-    // Separar las criaturas al aparecer.
-    for (let i = 0; i < creatures.length; i++) {
-        for (let j = 0; j < i; j++) {
-            const a = creatures[i];
-            const b = creatures[j];
-
-            if (Math.hypot(a.x - b.x, a.y - b.y) < 16) {
-                a.x = rand(15, W - 15);
-                a.y = rand(20, H - 15);
-            }
-        }
-    }
-
-    updateCounters();
-}
-
-function updateCounters() {
-    scoreElement.textContent = String(score).padStart(2, "0");
-    remainingElement.textContent = creatures.length;
-}
-
-// ================================================
-// ACTUALIZACIÓN Y DIBUJO
-// ================================================
-
-function startGame() {
-    if (running) return;
-
-    running = true;
-    startMessage.style.display = "none";
-    lastTime = 0;
-
-    animationId = requestAnimationFrame(gameLoop);
-}
-
-function restartGame() {
-    running = false;
-
-    if (animationId !== null) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
-
-    score = 0;
-    mouse = { x: -100, y: -100, inside: false };
-
-    createCreatures();
-    drawScene();
-
-    startMessage.style.display = "flex";
-    startButton.textContent = "COMENZAR JUEGO";
-}
-
-function gameLoop(timestamp) {
-    if (!running) return;
-
-    const dt = lastTime
-        ? Math.min((timestamp - lastTime) / 1000, 0.04)
-        : 0;
-
-    lastTime = timestamp;
-
-    update(dt);
-    drawScene();
-
-    animationId = requestAnimationFrame(gameLoop);
-}
-
-function update(dt) {
-    creatures.forEach(creature => creature.update(dt));
-
-    for (let i = 0; i < creatures.length; i++) {
-        for (let j = i + 1; j < creatures.length; j++) {
-            creatures[i].bounceFrom(creatures[j]);
-        }
-    }
-}
-
-function drawScene() {
-    if (!canvas.width || !canvas.height) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Mantener el escenario 16:9 sin deformarlo.
-    const scale = Math.min(
-        canvas.width / W,
-        canvas.height / H
-    );
-
-    const drawWidth = W * scale;
-    const drawHeight = H * scale;
-
-    const offsetX = (canvas.width - drawWidth) / 2;
-    const offsetY = (canvas.height - drawHeight) / 2;
-
-    ctx.save();
-
-    // Fondo exterior si la proporción de la ventana no es 16:9.
-    ctx.fillStyle = "#101329";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.translate(offsetX, offsetY);
-    ctx.scale(scale, scale);
-
-    drawBackground();
-
-    creatures.forEach(creature => creature.draw());
-
-    if (mouse.inside) {
-        drawCustomCursor(mouse.x, mouse.y);
-    }
-
-    ctx.restore();
-}
-
-// ================================================
-// CURSOR PERSONALIZADO: VARITA MÁGICA
-// ================================================
-
-function drawCustomCursor(x, y) {
-    rect(x - 1, y - 8, 2, 3, "#fff2a8");
-    rect(x - 7, y - 1, 3, 2, "#ff91d2");
-    rect(x + 4, y - 2, 3, 2, "#ff91d2");
-    rect(x - 1, y + 5, 2, 3, "#fff2a8");
-
-    rect(x - 2, y - 3, 3, 3, "#f4d3a0");
-    rect(x, y - 5, 3, 3, "#d8b0ff");
-    rect(x + 2, y - 7, 3, 3, "#d8b0ff");
-    rect(x + 4, y - 9, 3, 3, "#fff0b7");
-    rect(x + 5, y - 10, 3, 3, "#ffffff");
-}
-
-// ================================================
-// RATÓN Y CLICS
-// ================================================
-
-function getMousePosition(event) {
-    const rectCanvas = canvas.getBoundingClientRect();
-
-    const screenX =
-        (event.clientX - rectCanvas.left) / rectCanvas.width * canvas.width;
-
-    const screenY =
-        (event.clientY - rectCanvas.top) / rectCanvas.height * canvas.height;
-
-    const scale = Math.min(
-        canvas.width / W,
-        canvas.height / H
-    );
-
-    return {
-        x: (screenX - (canvas.width - W * scale) / 2) / scale,
-        y: (screenY - (canvas.height - H * scale) / 2) / scale
-    };
-}
-
-canvas.addEventListener("pointermove", event => {
-    const pos = getMousePosition(event);
-
-    mouse.x = pos.x;
-    mouse.y = pos.y;
-    mouse.inside = true;
-});
-
-canvas.addEventListener("pointerleave", () => {
-    mouse.inside = false;
-});
-
-canvas.addEventListener("pointerdown", event => {
-    if (!running) return;
-
-    const pos = getMousePosition(event);
-
-    for (let i = creatures.length - 1; i >= 0; i--) {
-        const creature = creatures[i];
-
-        if (creature.containsPoint(pos.x, pos.y)) {
-            creature.squashCreature();
-            score++;
-            updateCounters();
-            break;
-        }
-    }
-});
-
-// ================================================
-// MÚSICA AMBIENTAL
-// ================================================
-
-function stopMusic() {
-    if (audioContext && masterGain) {
-        masterGain.gain.setTargetAtTime(
-            0,
-            audioContext.currentTime,
-            0.1
-        );
-    }
-
-    musicNodes.forEach(node => {
-        try {
-            node.stop();
-        } catch (_) {}
-    });
-
-    musicNodes = [];
-    masterGain = null;
-    musicEnabled = false;
-
-    musicButton.textContent = "♫ ACTIVAR MÚSICA";
-}
+let lastTime = 0;
+let animationId = null;
+
+// ==========================================
+// AUDIO
+// ==========================================
+
+backgroundMusic.volume = 0.25;
+screamerAudio.volume = 0.65;
 
 async function startMusic() {
-    const AudioContextClass =
-        window.AudioContext || window.webkitAudioContext;
-
-    if (!AudioContextClass) {
-        alert("Tu navegador no permite reproducir la música ambiental.");
-        return;
+    try {
+        await backgroundMusic.play();
+        musicEnabled = true;
+        musicButton.textContent = "♫ SILENCIAR MÚSICA";
+    } catch (error) {
+        console.warn("No se pudo reproducir la música:", error);
+        musicEnabled = false;
+        musicButton.textContent = "♫ ACTIVAR MÚSICA";
     }
-
-    if (!audioContext) {
-        audioContext = new AudioContextClass();
-    }
-
-    await audioContext.resume();
-
-    masterGain = audioContext.createGain();
-    masterGain.gain.value = 0.035;
-    masterGain.connect(audioContext.destination);
-
-    [55, 65.41, 82.41].forEach((frequency, index) => {
-        const oscillator = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-
-        oscillator.type = index === 1 ? "triangle" : "sine";
-        oscillator.frequency.value = frequency;
-        gain.gain.value = index === 0 ? 0.5 : 0.22;
-
-        oscillator.connect(gain);
-        gain.connect(masterGain);
-        oscillator.start();
-
-        musicNodes.push(oscillator);
-    });
-
-    musicEnabled = true;
-    musicButton.textContent = "♫ SILENCIAR MÚSICA";
 }
 
-// ================================================
-// BOTONES E INICIALIZACIÓN
-// ================================================
-
-startButton.addEventListener("click", startGame);
-restartButton.addEventListener("click", restartGame);
+function stopMusic() {
+    backgroundMusic.pause();
+    musicEnabled = false;
+    musicButton.textContent = "♫ ACTIVAR MÚSICA";
+}
 
 musicButton.addEventListener("click", () => {
     if (musicEnabled) {
@@ -844,10 +64,630 @@ musicButton.addEventListener("click", () => {
     }
 });
 
-createCreatures();
+function playScreamerSound() {
+    screamerAudio.pause();
+    screamerAudio.currentTime = 0;
 
-// Esperar a que el navegador calcule el tamaño real del Canvas.
-requestAnimationFrame(() => {
-    resizeCanvas();
+    screamerAudio.play().catch(error => {
+        console.warn("No se pudo reproducir el grito.", error);
+    });
+}
+
+// ==========================================
+// CLASE DE LAS CRIATURAS
+// ==========================================
+
+class Creature {
+    constructor() {
+        this.respawn(true);
+    }
+
+    respawn(initial = false) {
+        this.x = rand(10, W - 10);
+        this.y = rand(30, H - 10);
+
+        this.size = rand(5, 8);
+        this.radius = this.size * 0.8;
+
+        this.type = choose([
+            "ghost",
+            "pumpkin",
+            "bat",
+            "zombie",
+            "cat"
+        ]);
+
+        this.color = choose({
+            ghost: ["#e7e1ff", "#b8f5ed", "#e8c8ff"],
+            pumpkin: ["#ff8738", "#ffb347", "#df6225"],
+            bat: ["#8e75c9", "#b29ae9", "#7061a8"],
+            zombie: ["#78c76a", "#91b96b", "#65a85e"],
+            cat: ["#c4b8a5", "#d5d0c8", "#9f91a8"]
+        }[this.type]);
+
+        this.originalColor = this.color;
+
+        const angle = rand(0, Math.PI * 2);
+        const speed = rand(12, 27);
+
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+
+        this.mode = choose(["normal", "diagonal", "circular"]);
+        this.phase = rand(0, Math.PI * 2);
+        this.age = 0;
+        this.life = rand(8, 22);
+        this.flash = 0;
+        this.squashed = 0;
+    }
+
+    update(dt) {
+        this.age += dt;
+
+        if (this.flash > 0) {
+            this.flash -= dt;
+        }
+
+        if (this.squashed > 0) {
+            this.squashed -= dt;
+
+            if (this.squashed <= 0) {
+                this.respawn();
+            }
+
+            return;
+        }
+
+        if (this.mode === "circular") {
+            this.phase += dt * 1.8;
+            this.x += Math.cos(this.phase) * 18 * dt;
+            this.y += Math.sin(this.phase) * 18 * dt;
+        } else {
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+        }
+
+        // Rebote en los límites
+        if (this.x < this.radius || this.x > W - this.radius) {
+            this.vx *= -1;
+            this.x = Math.max(
+                this.radius,
+                Math.min(W - this.radius, this.x)
+            );
+        }
+
+        if (this.y < 24 || this.y > H - this.radius) {
+            this.vy *= -1;
+            this.y = Math.max(
+                24,
+                Math.min(H - this.radius, this.y)
+            );
+        }
+
+        // Cambiar de movimiento periódicamente
+        if (this.age > this.life) {
+            this.mode = choose(["normal", "diagonal", "circular"]);
+            this.age = 0;
+            this.life = rand(8, 22);
+
+            if (this.mode !== "circular") {
+                this.vx = rand(-25, 25);
+                this.vy = rand(-25, 25);
+
+                if (Math.abs(this.vx) < 8) this.vx = 12;
+                if (Math.abs(this.vy) < 8) this.vy = -12;
+            }
+        }
+    }
+
+    draw() {
+        if (this.squashed > 0) {
+            ctx.fillStyle = "#f3b5e8";
+            ctx.fillRect(
+                this.x - this.size,
+                this.y,
+                this.size * 2,
+                2
+            );
+
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(this.x - 2, this.y, 2, 1);
+            return;
+        }
+
+        const s = this.size;
+        const x = Math.round(this.x);
+        const y = Math.round(this.y);
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Flash azul durante las colisiones
+        ctx.fillStyle = this.flash > 0
+            ? "#0000ff"
+            : this.originalColor;
+
+        if (this.type === "ghost") {
+            ctx.fillRect(-s, -s, s * 2, s * 2);
+            ctx.fillRect(-s + 2, -s - 2, s * 2 - 4, 2);
+
+            ctx.clearRect(-s + 2, s - 2, 3, 3);
+            ctx.clearRect(2, s - 2, 3, 3);
+
+            ctx.fillStyle = "#20172d";
+            ctx.fillRect(-s + 2, -2, 2, 3);
+            ctx.fillRect(2, -2, 2, 3);
+
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(-s + 3, -2, 1, 1);
+            ctx.fillRect(3, -2, 1, 1);
+        }
+
+        if (this.type === "pumpkin") {
+            ctx.fillRect(-s, -s + 2, s * 2, s * 2 - 2);
+            ctx.fillRect(-s + 2, -s, s * 2 - 4, s * 2);
+
+            ctx.fillStyle = "#496b38";
+            ctx.fillRect(-1, -s - 3, 3, 4);
+
+            ctx.fillStyle = "#21132b";
+            ctx.fillRect(-s + 2, -2, 3, 3);
+            ctx.fillRect(2, -2, 3, 3);
+            ctx.fillRect(-2, 3, 4, 2);
+        }
+
+        if (this.type === "bat") {
+            ctx.fillRect(-s, -2, s * 2, s);
+            ctx.fillRect(-s - 4, -s, 4, s);
+            ctx.fillRect(s, -s, 4, s);
+            ctx.fillRect(-s + 1, -s - 2, 3, 3);
+            ctx.fillRect(s - 4, -s - 2, 3, 3);
+
+            ctx.fillStyle = "#ff6b6b";
+            ctx.fillRect(-3, -1, 2, 2);
+            ctx.fillRect(2, -1, 2, 2);
+        }
+
+        if (this.type === "zombie") {
+            ctx.fillRect(-s + 1, -s, s * 2 - 2, s * 2);
+            ctx.fillRect(-s - 2, -s + 2, 3, s);
+            ctx.fillRect(s - 1, -s + 2, 3, s);
+
+            ctx.fillStyle = "#20252a";
+            ctx.fillRect(-s + 2, -2, 3, 2);
+            ctx.fillRect(2, -2, 3, 2);
+            ctx.fillRect(-2, 3, 4, 2);
+        }
+
+        if (this.type === "cat") {
+            ctx.fillRect(-s, -s + 2, s * 2, s * 2 - 2);
+            ctx.fillRect(-s, -s - 3, 3, 5);
+            ctx.fillRect(s - 3, -s - 3, 3, 5);
+
+            ctx.fillStyle = "#1d1724";
+            ctx.fillRect(-s + 2, -1, 2, 2);
+            ctx.fillRect(2, -1, 2, 2);
+
+            ctx.fillStyle = "#f4a6b8";
+            ctx.fillRect(-1, 2, 2, 2);
+        }
+
+        ctx.restore();
+    }
+
+    squash() {
+        if (this.squashed > 0) return;
+
+        this.squashed = 0.25;
+        score++;
+        scoreElement.textContent = score;
+    }
+}
+
+// ==========================================
+// CREAR LAS CRIATURAS
+// ==========================================
+
+function createCreatures() {
+    creatures = [];
+
+    for (let i = 0; i < TOTAL_CREATURES; i++) {
+        creatures.push(new Creature());
+    }
+
+    for (const creature of creatures) {
+        creature.x = rand(8, W - 8);
+        creature.y = rand(28, H - 8);
+    }
+}
+
+// ==========================================
+// FONDO PIXEL ART: CEMENTERIO NOCTURNO
+// ==========================================
+
+function drawBackground() {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#08091b");
+    sky.addColorStop(0.55, "#17112c");
+    sky.addColorStop(1, "#30203b");
+
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // Luna pixelada
+    ctx.fillStyle = "#bcb4e6";
+    ctx.fillRect(244, 13, 18, 18);
+
+    ctx.fillStyle = "#e8e2ff";
+    ctx.fillRect(247, 10, 12, 22);
+    ctx.fillRect(242, 15, 20, 12);
+
+    ctx.fillStyle = "#9d95c5";
+    ctx.fillRect(253, 13, 3, 3);
+    ctx.fillRect(247, 24, 4, 3);
+
+    // Estrellas
+    ctx.fillStyle = "#eee3ff";
+
+    for (let i = 0; i < 35; i++) {
+        const sx = (i * 47 + 13) % W;
+        const sy = (i * 23 + 7) % 65;
+        const size = i % 4 === 0 ? 2 : 1;
+
+        ctx.fillRect(sx, sy, size, size);
+    }
+
+    // Montañas
+    ctx.fillStyle = "#17142a";
+    ctx.beginPath();
+    ctx.moveTo(0, 76);
+    ctx.lineTo(35, 48);
+    ctx.lineTo(65, 76);
+    ctx.lineTo(100, 42);
+    ctx.lineTo(140, 76);
+    ctx.lineTo(190, 53);
+    ctx.lineTo(230, 78);
+    ctx.lineTo(280, 45);
+    ctx.lineTo(320, 73);
+    ctx.lineTo(320, 120);
+    ctx.lineTo(0, 120);
+    ctx.closePath();
+    ctx.fill();
+
+    // Suelo
+    ctx.fillStyle = "#201a2b";
+    ctx.fillRect(0, 104, W, H - 104);
+
+    ctx.fillStyle = "#32223a";
+    ctx.fillRect(0, 105, W, 3);
+
+    // Tumbas
+    for (let i = 0; i < 9; i++) {
+        const x = i * 39 + 4;
+        const y = 91 + (i % 3) * 9;
+
+        ctx.fillStyle = "#51445d";
+        ctx.fillRect(x, y, 15, 14);
+        ctx.fillRect(x + 3, y - 4, 9, 4);
+
+        ctx.fillStyle = "#74647b";
+        ctx.fillRect(x + 3, y + 2, 2, 9);
+
+        ctx.fillStyle = "#30273c";
+        ctx.fillRect(x + 7, y + 3, 2, 8);
+    }
+
+    // Cruces
+    for (let i = 0; i < 4; i++) {
+        const x = 20 + i * 88;
+        const y = 77 + (i % 2) * 13;
+
+        ctx.fillStyle = "#887a91";
+        ctx.fillRect(x + 4, y, 3, 18);
+        ctx.fillRect(x, y + 4, 11, 3);
+    }
+
+    drawTree(15, 76);
+    drawTree(298, 69);
+}
+
+function drawTree(x, y) {
+    ctx.fillStyle = "#17121d";
+    ctx.fillRect(x, y, 5, 43);
+    ctx.fillRect(x - 7, y + 5, 8, 4);
+    ctx.fillRect(x - 10, y - 2, 4, 10);
+    ctx.fillRect(x + 4, y + 7, 11, 4);
+    ctx.fillRect(x + 11, y + 2, 4, 9);
+    ctx.fillRect(x - 5, y + 18, 12, 4);
+}
+
+// ==========================================
+// SCREAMER
+// ==========================================
+
+const screamer = {
+    active: false,
+    timer: 0,
+    nextIn: rand(8, 15)
+};
+
+function updateScreamer(dt) {
+    if (!gameRunning) return;
+
+    if (screamer.active) {
+        screamer.timer -= dt;
+
+        if (screamer.timer <= 0) {
+            screamer.active = false;
+            screamer.nextIn = rand(8, 17);
+
+            screamerAudio.pause();
+            screamerAudio.currentTime = 0;
+        }
+
+        return;
+    }
+
+    screamer.nextIn -= dt;
+
+    if (screamer.nextIn <= 0) {
+        screamer.active = true;
+        screamer.timer = 0.9;
+        playScreamerSound();
+    }
+}
+
+function drawScreamer() {
+    if (!screamer.active) return;
+
+    // Destello rojo
+    ctx.fillStyle = "rgba(130, 0, 10, 0.82)";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+
+    const shake = Math.random() * 4 - 2;
+    ctx.translate(shake, shake);
+
+    // Sombra
+    ctx.fillStyle = "#13050c";
+    ctx.fillRect(-65, -68, 130, 136);
+
+    // Cabeza
+    ctx.fillStyle = "#e9ded7";
+    ctx.fillRect(-48, -59, 96, 112);
+    ctx.fillRect(-58, -39, 116, 75);
+    ctx.fillRect(-38, -66, 76, 9);
+
+    // Sombras de la cara
+    ctx.fillStyle = "#9e8c99";
+    ctx.fillRect(-38, -49, 19, 9);
+    ctx.fillRect(19, -49, 19, 9);
+    ctx.fillRect(-48, 26, 13, 13);
+    ctx.fillRect(35, 26, 13, 13);
+
+    // Ojos
+    ctx.fillStyle = "#14040c";
+    ctx.fillRect(-38, -24, 26, 30);
+    ctx.fillRect(12, -24, 26, 30);
+
+    ctx.fillStyle = "#ff102d";
+    ctx.fillRect(-31, -17, 13, 16);
+    ctx.fillRect(19, -17, 13, 16);
+
+    ctx.fillStyle = "#fff1f1";
+    ctx.fillRect(-28, -15, 5, 5);
+    ctx.fillRect(22, -15, 5, 5);
+
+    // Nariz
+    ctx.fillStyle = "#57404d";
+    ctx.fillRect(-5, 7, 10, 13);
+    ctx.fillRect(-10, 16, 20, 5);
+
+    // Boca abierta
+    ctx.fillStyle = "#21020b";
+    ctx.fillRect(-29, 25, 58, 27);
+    ctx.fillRect(-23, 20, 46, 5);
+
+    // Dientes
+    ctx.fillStyle = "#fff3e7";
+    ctx.fillRect(-23, 25, 8, 9);
+    ctx.fillRect(-8, 25, 8, 9);
+    ctx.fillRect(8, 25, 8, 9);
+    ctx.fillRect(19, 25, 5, 9);
+
+    // Lengua
+    ctx.fillStyle = "#d42b55";
+    ctx.fillRect(-9, 42, 19, 6);
+
+    ctx.restore();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 12px Courier New";
+    ctx.textAlign = "center";
+    ctx.fillText("¡¡¡TE ENCONTRÉ!!!", W / 2, 15);
+}
+
+// ==========================================
+// COLISIONES ENTRE CRIATURAS
+// ==========================================
+
+function checkCollisions() {
+    for (let i = 0; i < creatures.length; i++) {
+        const a = creatures[i];
+
+        if (a.squashed > 0) continue;
+
+        for (let j = i + 1; j < creatures.length; j++) {
+            const b = creatures[j];
+
+            if (b.squashed > 0) continue;
+
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const distance = Math.hypot(dx, dy);
+            const minDistance = a.radius + b.radius;
+
+            if (distance < minDistance && distance > 0) {
+                const overlap = (minDistance - distance) / 2;
+                const nx = dx / distance;
+                const ny = dy / distance;
+
+                a.x -= nx * overlap;
+                a.y -= ny * overlap;
+                b.x += nx * overlap;
+                b.y += ny * overlap;
+
+                const relativeVelocity =
+                    (b.vx - a.vx) * nx +
+                    (b.vy - a.vy) * ny;
+
+                if (relativeVelocity < 0) {
+                    a.vx += relativeVelocity * nx;
+                    a.vy += relativeVelocity * ny;
+                    b.vx -= relativeVelocity * nx;
+                    b.vy -= relativeVelocity * ny;
+                }
+
+                a.flash = 0.16;
+                b.flash = 0.16;
+            }
+        }
+    }
+}
+
+// ==========================================
+// ACTUALIZACIÓN Y DIBUJO
+// ==========================================
+
+function update(dt) {
+    for (const creature of creatures) {
+        creature.update(dt);
+    }
+
+    checkCollisions();
+    updateScreamer(dt);
+}
+
+function drawScene() {
+    drawBackground();
+
+    for (const creature of creatures) {
+        creature.draw();
+    }
+
+    drawScreamer();
+}
+
+// ==========================================
+// BUCLE PRINCIPAL
+// ==========================================
+
+function gameLoop(timestamp) {
+    if (!gameRunning) return;
+
+    const dt = lastTime === 0
+        ? 0
+        : Math.min((timestamp - lastTime) / 1000, 0.04);
+
+    lastTime = timestamp;
+
+    update(dt);
     drawScene();
+
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+// ==========================================
+// INICIAR Y REINICIAR
+// ==========================================
+
+function startGame() {
+    if (gameRunning) return;
+
+    gameRunning = true;
+    startOverlay.classList.add("hidden");
+    statusElement.textContent = "¡ATRAPA LAS CRIATURAS!";
+
+    lastTime = 0;
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+function restartGame() {
+    gameRunning = false;
+
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
+    score = 0;
+    scoreElement.textContent = score;
+
+    screamer.active = false;
+    screamer.timer = 0;
+    screamer.nextIn = rand(8, 15);
+
+    screamerAudio.pause();
+    screamerAudio.currentTime = 0;
+
+    createCreatures();
+    drawScene();
+
+    startOverlay.classList.remove("hidden");
+    statusElement.textContent = "PRESIONA INICIAR";
+    startButton.textContent = "▶ INICIAR JUEGO";
+
+    lastTime = 0;
+}
+
+startButton.addEventListener("click", async () => {
+    startGame();
+
+    if (!musicEnabled) {
+        await startMusic();
+    }
 });
+
+restartButton.addEventListener("click", () => {
+    restartGame();
+});
+
+// ==========================================
+// ATRAPAR CRIATURAS CON EL MOUSE
+// ==========================================
+
+canvas.addEventListener("pointerdown", event => {
+    if (!gameRunning || screamer.active) return;
+
+    const rect = canvas.getBoundingClientRect();
+
+    const mouseX =
+        (event.clientX - rect.left) * (W / rect.width);
+
+    const mouseY =
+        (event.clientY - rect.top) * (H / rect.height);
+
+    for (let i = creatures.length - 1; i >= 0; i--) {
+        const creature = creatures[i];
+
+        if (creature.squashed > 0) continue;
+
+        const dx = mouseX - creature.x;
+        const dy = mouseY - creature.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance <= creature.radius + 4) {
+            creature.squash();
+            break;
+        }
+    }
+});
+
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
+
+createCreatures();
+drawScene();
