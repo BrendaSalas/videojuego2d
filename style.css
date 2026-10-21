@@ -16,27 +16,31 @@
 html,
 body {
     width: 100%;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
     margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
 body {
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
     color: var(--cream);
-    background: #100d20;
+    background: var(--night);
     font-family: 'Nunito', sans-serif;
 }
 
+/* ENCABEZADO */
 header {
     flex: 0 0 auto;
-    padding: 8px 12px !important;
+    padding: 5px 10px !important;
     background: #171126;
     border-bottom: 3px solid #46325d;
     box-shadow: 0 3px 0 #0b0915;
+    text-align: center;
 }
 
 .header-icon {
@@ -47,64 +51,70 @@ h1 {
     margin: 0;
     color: var(--pink);
     font-family: 'Press Start 2P', monospace;
-    font-size: clamp(15px, 2vw, 27px);
-    line-height: 1.6;
+    font-size: clamp(13px, 2vw, 25px);
+    line-height: 1.5;
     text-shadow: 3px 3px 0 #58326f;
 }
 
 .subtitle {
     margin: 2px 0 0;
     color: var(--mint);
-    font-size: 12px;
+    font-size: 11px;
     letter-spacing: 2px;
     font-weight: 900;
 }
 
+/* ÁREA PRINCIPAL */
 main.container-fluid {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 0;
     width: 100%;
-    padding: 10px !important;
+    padding: 6px !important;
     display: flex;
-    flex-direction: column;
+    overflow: hidden;
 }
 
+/* PANEL DEL JUEGO */
 .game-panel {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 0;
     width: 100%;
     max-width: none;
     margin: 0;
-    padding: 10px;
+    padding: 7px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     background: var(--panel);
     border: 4px solid #49365d;
-    box-shadow: 5px 5px 0 #090711;
+    box-shadow: 4px 4px 0 #090711;
 }
 
+/* MARCADOR */
 .game-topbar,
 .game-controls {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .game-topbar {
-    flex: 0 0 auto;
-    padding: 0 3px 8px;
+    padding: 0 3px 7px;
     font-family: 'Press Start 2P', monospace;
-    font-size: clamp(8px, 0.9vw, 11px);
+    font-size: clamp(7px, 0.85vw, 10px);
     line-height: 1.7;
 }
 
 .status-dot {
     display: inline-block;
-    width: 9px;
-    height: 9px;
-    margin-right: 7px;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
     background: var(--mint);
     box-shadow: 0 0 8px var(--mint);
 }
@@ -112,79 +122,84 @@ main.container-fluid {
 .score-box {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     color: var(--pink);
 }
 
 #score {
-    min-width: 36px;
+    min-width: 34px;
     padding: 4px;
     color: #171126;
     background: var(--pink);
     text-align: center;
-    font-size: 12px;
+    font-size: 11px;
 }
 
+/* INSTRUCCIONES */
 .instructions {
     flex: 0 0 auto;
     display: flex;
     justify-content: space-between;
-    gap: 5px 15px;
+    gap: 4px 12px;
     flex-wrap: wrap;
-    padding: 6px 10px;
-    margin-bottom: 8px;
+    padding: 6px 9px;
+    margin-bottom: 7px;
     color: #e4d9ff;
     background: #171126;
     border-left: 4px solid var(--purple);
-    font-size: 12px;
+    font-size: 11px;
 }
 
+/* MARCO PIXEL ART */
 .canvas-frame {
     position: relative;
-    flex: 1 1 auto;
-    min-height: 180px;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
     width: 100%;
     overflow: hidden;
     background: #101329;
-
-    /* El borde se conserva alrededor de todo el escenario */
     border: 4px solid #9d6bff;
     box-shadow:
         inset 0 0 0 2px #302044,
         0 0 0 2px #0c0916;
 }
 
+/* CANVAS RESPONSIVO */
 #gameCanvas {
     display: block;
     width: 100%;
     height: 100%;
+    max-width: 100%;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     cursor: none;
     touch-action: manipulation;
 }
 
+/* PANTALLA DE INICIO */
 .start-message {
     position: absolute;
     inset: 0;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     gap: 12px;
+    padding: 10px;
     background: rgb(12 9 28 / 82%);
     text-align: center;
     line-height: 1.5;
 }
 
 .start-message span {
-    font-size: clamp(35px, 6vh, 65px);
+    font-size: clamp(30px, 6vh, 60px);
     animation: floatGhost 1.5s steps(4, end) infinite;
 }
 
 .start-message p {
     margin: 0;
-    padding: 0 8px;
     color: var(--pink);
     font-family: 'Press Start 2P', monospace;
     font-size: clamp(8px, 1.2vw, 13px);
@@ -193,14 +208,14 @@ main.container-fluid {
 
 .btn-pixel,
 .control-button {
-    padding: 9px 12px;
+    padding: 8px 10px;
     color: #171126;
     background: var(--mint);
     border: 0;
     border-bottom: 4px solid #4a9d65;
     font-family: 'Press Start 2P', monospace;
     font-size: 8px;
-    line-height: 1.8;
+    line-height: 1.7;
     cursor: pointer;
 }
 
@@ -215,9 +230,9 @@ main.container-fluid {
     border-bottom-width: 2px;
 }
 
+/* CONTROLES */
 .game-controls {
-    flex: 0 0 auto;
-    padding-top: 9px;
+    padding-top: 8px;
 }
 
 .control-button {
@@ -232,51 +247,59 @@ main.container-fluid {
 }
 
 .remaining {
-    font-size: 11px;
-    font-weight: 900;
     color: var(--mint);
+    font-size: 10px;
+    font-weight: 900;
 }
 
+/* PIE DE PÁGINA */
 footer {
     flex: 0 0 auto;
     margin: 0 !important;
-    padding: 5px 8px;
+    padding: 3px 6px;
     color: #b6a8c9;
     background: #0a0913;
     border-top: 3px solid #3a294d;
     text-align: center;
-    font-size: 10px;
+    font-size: 9px;
 }
 
 footer .container {
-    padding-top: 3px !important;
-    padding-bottom: 3px !important;
+    width: 100%;
+    max-width: none;
+    padding: 2px !important;
 }
 
 footer p {
-    margin-bottom: 2px !important;
+    margin: 0 0 2px !important;
 }
 
 .footer-title {
     color: var(--pink);
     font-family: 'Press Start 2P', monospace;
     font-size: 8px;
-    line-height: 1.7;
+    line-height: 1.6;
 }
 
+/* ANIMACIONES */
 @keyframes floatGhost {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-7px); }
+    0%, 100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-7px);
+    }
 }
 
-/* Pantallas pequeñas */
+/* TABLET Y CELULAR */
 @media (max-width: 600px) {
     main.container-fluid {
-        padding: 5px !important;
+        padding: 4px !important;
     }
 
     .game-panel {
-        padding: 6px;
+        padding: 5px;
         border-width: 3px;
     }
 
@@ -285,56 +308,72 @@ footer p {
     }
 
     .instructions {
-        font-size: 10px;
+        font-size: 9px;
+        padding: 5px;
     }
 
     .game-controls {
-        gap: 6px;
+        gap: 5px;
+        padding-top: 5px;
     }
 
     .control-button,
     .btn-pixel {
-        padding: 7px;
+        padding: 6px;
         font-size: 7px;
     }
 
     .remaining {
-        font-size: 10px;
+        font-size: 9px;
     }
 
     footer {
-        font-size: 9px;
+        font-size: 8px;
     }
 }
 
-/* En ventanas de poca altura, reducir elementos auxiliares */
-@media (max-height: 650px) {
+/* VENTANAS CON POCA ALTURA */
+@media (max-height: 500px) {
     header {
-        padding: 4px 8px !important;
+        padding: 2px 6px !important;
+    }
+
+    h1 {
+        font-size: 13px;
     }
 
     .subtitle {
-        font-size: 10px;
+        display: none;
     }
 
     main.container-fluid {
-        padding: 5px !important;
-    }
-
-    .instructions {
-        padding: 4px 8px;
-        margin-bottom: 5px;
+        padding: 3px !important;
     }
 
     .game-panel {
-        padding: 6px;
+        padding: 4px;
+    }
+
+    .game-topbar {
+        padding-bottom: 3px;
+    }
+
+    .instructions {
+        padding: 3px 6px;
+        margin-bottom: 3px;
+        font-size: 9px;
     }
 
     .game-controls {
-        padding-top: 5px;
+        padding-top: 3px;
     }
 
     footer {
-        padding: 3px;
+        padding: 2px;
+        font-size: 7px;
+    }
+
+    .footer-title {
+        font-size: 7px;
     }
 }

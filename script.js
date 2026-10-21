@@ -17,10 +17,23 @@ let score = 0;
 let running = false;
 let animationId = null;
 let lastTime = 0;
-let mouse = { x: -100, y: -100, inside: false };
+
+let mouse = {
+    x: -100,
+    y: -100,
+    inside: false
+};
+
 let audioContext = null;
 let musicEnabled = false;
 let musicNodes = [];
+let masterGain = null;
+
+// Escala y desplazamiento para adaptar el mundo a la ventana.
+let scaleX = 1;
+let scaleY = 1;
+let offsetX = 0;
+let offsetY = 0;
 
 const colors = {
     ghost: "#e9f4e9",
@@ -36,20 +49,51 @@ const choice = arr => arr[Math.floor(Math.random() * arr.length)];
 
 function rect(x, y, w, h, color) {
     ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    ctx.fillRect(
+        Math.round(x),
+        Math.round(y),
+        Math.max(1, Math.round(w)),
+        Math.max(1, Math.round(h))
+    );
 }
 
-// --------------------------------------------------
-// FONDO PIXEL ART: CEMENTERIO NOCTURNO
-// --------------------------------------------------
+// ================================================
+// AJUSTE RESPONSIVO DEL CANVAS
+// ================================================
+
+function resizeCanvas() {
+    const rectCanvas = canvas.getBoundingClientRect();
+
+    if (rectCanvas.width <= 0 || rectCanvas.height <= 0) return;
+
+    // Resolución interna basada en múltiplos para conservar píxeles.
+    const pixelScale = Math.max(
+        1,
+        Math.floor(Math.min(rectCanvas.width / W, rectCanvas.height / H))
+    );
+
+    // El canvas interno conserva una proporción 16:9.
+    canvas.width = W * pixelScale;
+    canvas.height = H * pixelScale;
+
+    scaleX = canvas.width / W;
+    scaleY = canvas.height / H;
+
+    drawScene();
+}
+
+window.addEventListener("resize", resizeCanvas);
+
+// ================================================
+// FONDO: CEMENTERIO PIXEL ART
+// ================================================
 
 function drawBackground() {
-    // Cielo nocturno
     rect(0, 0, W, H, "#11142d");
     rect(0, 0, W, 85, "#171a38");
     rect(0, 85, W, 55, "#20213a");
 
-    // Luna pixelada
+    // Luna
     rect(239, 13, 23, 23, "#b9c8d7");
     rect(235, 18, 4, 13, "#b9c8d7");
     rect(244, 9, 13, 4, "#b9c8d7");
@@ -61,11 +105,17 @@ function drawBackground() {
     for (let i = 0; i < 35; i++) {
         const x = (i * 47 + 13) % W;
         const y = (i * 29 + 7) % 68;
-        rect(x, y, i % 4 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1,
-            i % 3 === 0 ? "#f7d9a1" : "#a7b9e9");
+
+        rect(
+            x,
+            y,
+            i % 4 === 0 ? 2 : 1,
+            i % 4 === 0 ? 2 : 1,
+            i % 3 === 0 ? "#f7d9a1" : "#a7b9e9"
+        );
     }
 
-    // Nubes oscuras
+    // Nubes
     rect(22, 24, 31, 5, "#252746");
     rect(14, 29, 43, 4, "#252746");
     rect(70, 43, 24, 4, "#222640");
@@ -73,8 +123,9 @@ function drawBackground() {
     rect(175, 27, 29, 4, "#252746");
     rect(184, 31, 31, 4, "#252746");
 
-    // Siluetas de montañas y árboles lejanos
-    rect(0, 72, 320, 18, "#202a3c");
+    // Árboles lejanos
+    rect(0, 72, W, 18, "#202a3c");
+
     for (let x = -5; x < W; x += 19) {
         rect(x + 6, 48 + (x % 3) * 3, 4, 36, "#111a29");
         rect(x, 58 + (x % 2) * 4, 16, 17, "#182438");
@@ -82,47 +133,42 @@ function drawBackground() {
         rect(x + 6, 44 + (x % 3), 5, 12, "#182438");
     }
 
-    // Suelo con diferentes tonos de césped
+    // Suelo
     rect(0, 88, W, 92, "#29283b");
     rect(0, 91, W, 5, "#3a3948");
     rect(0, 96, W, 4, "#323246");
 
-    // Camino de piedra
+    // Camino
     rect(133, 95, 44, 85, "#454252");
     rect(141, 95, 29, 85, "#514b58");
+
     for (let y = 98; y < H; y += 12) {
         rect(136, y, 7, 1, "#29283b");
         rect(159, y + 5, 10, 1, "#393547");
     }
 
-    // Charcos y sombras del terreno
-    rect(19, 140, 36, 4, "#343346");
-    rect(27, 144, 20, 2, "#454359");
-    rect(211, 158, 48, 3, "#363448");
-    rect(225, 161, 28, 2, "#4c455b");
-
-    // Tumbas de fondo
+    // Tumbas
     drawGrave(18, 80, 17, 25, "#77748a", "#47465e");
     drawGrave(65, 85, 18, 27, "#77748a", "#4c4961");
     drawGrave(108, 81, 17, 24, "#66667d", "#44445c");
     drawGrave(202, 83, 19, 27, "#77748a", "#49465e");
     drawGrave(277, 80, 19, 29, "#858095", "#514a65");
 
-    // Cruces y detalles de lápidas
+    // Cruces
     rect(24, 83, 3, 8, "#c5b9a4");
     rect(21, 85, 9, 3, "#c5b9a4");
     rect(285, 83, 3, 9, "#d0bfa9");
     rect(282, 86, 9, 3, "#d0bfa9");
 
-    // Árboles muertos en primer plano
     drawDeadTree(5, 48, 1);
     drawDeadTree(302, 46, -1);
 
-    // Vallas rotas
+    // Vallas
     for (let x = 0; x < 64; x += 9) {
         rect(x, 112, 3, 18, "#65506d");
         rect(x - 2, 116, 7, 3, "#87677b");
     }
+
     rect(0, 114, 65, 3, "#87677b");
     rect(0, 125, 65, 3, "#654a68");
 
@@ -130,30 +176,32 @@ function drawBackground() {
         rect(x, 116, 3, 16, "#65506d");
         rect(x - 2, 119, 7, 3, "#87677b");
     }
+
     rect(247, 117, 73, 3, "#87677b");
     rect(247, 129, 73, 3, "#654a68");
 
-    // Calabazas decorativas
     drawPumpkin(77, 143, 0.8);
     drawPumpkin(257, 139, 0.7);
 
-    // Flores y pequeñas plantas
+    // Flores
     for (let i = 0; i < 22; i++) {
         const x = (i * 53 + 16) % W;
         const y = 105 + (i * 17) % 69;
+
         rect(x, y, 2, 5, "#527c54");
         rect(x - 2, y + 1, 2, 2, "#e49ab8");
         rect(x + 2, y + 2, 2, 2, "#b8a0ff");
     }
 
-    // Piedritas y píxeles de hierba
+    // Piedras
     for (let i = 0; i < 75; i++) {
         const x = (i * 37 + 9) % W;
         const y = 97 + (i * 23) % 80;
+
         rect(x, y, 2, 1, i % 2 ? "#494356" : "#505047");
     }
 
-    // Niebla pixelada
+    // Niebla
     rect(0, 105, 42, 4, "#77768b");
     rect(11, 109, 48, 3, "#53536e");
     rect(244, 105, 35, 3, "#77768b");
@@ -187,6 +235,7 @@ function drawDeadTree(x, y, direction) {
 
 function drawPumpkin(x, y, scale = 1) {
     const s = scale;
+
     rect(x + 4*s, y, 5*s, 3*s, "#59794b");
     rect(x + 2*s, y + 3*s, 10*s, 8*s, "#d96c35");
     rect(x, y + 5*s, 14*s, 5*s, "#f18b3c");
@@ -197,9 +246,9 @@ function drawPumpkin(x, y, scale = 1) {
     rect(x + 5*s, y + 8*s, 4*s, 2*s, "#42243a");
 }
 
-// --------------------------------------------------
-// CLASE CRIATURA: MOVIMIENTO, COLISIONES Y CLICS
-// --------------------------------------------------
+// ================================================
+// CLASE DE LAS CRIATURAS
+// ================================================
 
 class Creature {
     constructor() {
@@ -207,14 +256,17 @@ class Creature {
     }
 
     respawn(initial = false) {
-        this.x = rand(10, W - 10);
+        this.x = rand(12, W - 12);
         this.y = rand(18, H - 12);
-        this.size = rand(8, 12);
+        this.size = rand(5, 8);
+        this.radius = this.size * 0.7;
         this.speed = rand(18, 39);
+
         this.type = choice(["ghost", "pumpkin", "bat", "zombie", "cat"]);
         this.movement = choice(["up", "down", "diagonal", "circular"]);
         this.color = choice(Object.values(colors));
         this.originalColor = this.color;
+
         this.angle = rand(0, Math.PI * 2);
         this.phase = rand(0, Math.PI * 2);
         this.flash = 0;
@@ -222,7 +274,7 @@ class Creature {
         this.squashTimer = 0;
         this.opacity = 1;
         this.fadeDirection = 0;
-        this.radius = this.size * 0.7;
+
         this.dx = rand(-1, 1);
         this.dy = rand(-1, 1);
 
@@ -233,29 +285,24 @@ class Creature {
             this.dx = 0;
             this.dy = 1;
         } else if (this.movement === "diagonal") {
-            const sign = Math.random() < 0.5 ? -1 : 1;
-            this.dx = sign;
-            this.dy = sign * (Math.random() < 0.5 ? 1 : -1);
+            this.dx = Math.random() < 0.5 ? -1 : 1;
+            this.dy = Math.random() < 0.5 ? -1 : 1;
         }
 
         const length = Math.hypot(this.dx, this.dy) || 1;
         this.dx /= length;
         this.dy /= length;
-
-        if (!initial) {
-            // La criatura reaparece en una posición aleatoria.
-            this.x = rand(12, W - 12);
-            this.y = rand(22, H - 12);
-        }
     }
 
     update(dt) {
         if (this.squash > 0) {
             this.squashTimer -= dt;
+
             if (this.squashTimer <= 0) {
                 this.squash = 0;
                 this.respawn();
             }
+
             return;
         }
 
@@ -269,7 +316,6 @@ class Creature {
             this.x += Math.cos(this.angle) * velocity;
             this.y += Math.sin(this.angle) * velocity;
         } else {
-            // Pequeñas variaciones aleatorias del desplazamiento.
             if (Math.random() < 0.018) {
                 this.dx += rand(-0.25, 0.25);
                 this.dy += rand(-0.25, 0.25);
@@ -283,7 +329,7 @@ class Creature {
             this.y += this.dy * velocity;
         }
 
-        // Desaparición breve y reaparición aleatoria.
+        // Desaparecer y reaparecer brevemente.
         if (this.fadeDirection === 0 && Math.random() < 0.0008) {
             this.fadeDirection = 1;
         }
@@ -302,7 +348,6 @@ class Creature {
             }
         }
 
-        // Rebote contra los bordes del escenario.
         const margin = this.size + 2;
 
         if (this.x < margin) {
@@ -339,7 +384,6 @@ class Creature {
         const y = Math.round(this.y + Math.sin(this.phase) * 1.2);
         const s = this.size / 10;
 
-        // Sombra pixelada
         rect(x - 5*s, y + 5*s, 10*s, 2*s, "#10101d");
 
         if (this.flash > 0) {
@@ -379,11 +423,8 @@ class Creature {
         rect(x, y + 4*s, 3*s, 3*s, color);
         rect(x + 4*s, y + 3*s, 2*s, 2*s, color);
 
-        // Mejillas
         rect(x - 5*s, y + 1*s, 2*s, 2*s, "#ff9bbd");
         rect(x + 3*s, y + 1*s, 2*s, 2*s, "#ff9bbd");
-
-        // Ojos
         rect(x - 3*s, y - 2*s, 2*s, 3*s, "#27243d");
         rect(x + 2*s, y - 2*s, 2*s, 3*s, "#27243d");
         rect(x - 1*s, y + 2*s, 2*s, 1*s, "#6e6481");
@@ -432,7 +473,6 @@ class Creature {
     }
 
     drawCat(x, y, s) {
-        // Gatito fantasma con orejas puntiagudas
         rect(x - 6*s, y - 5*s, 3*s, 3*s, this.color);
         rect(x - 5*s, y - 7*s, 3*s, 3*s, this.color);
         rect(x + 3*s, y - 5*s, 3*s, 3*s, this.color);
@@ -453,15 +493,10 @@ class Creature {
         const width = this.size * 1.7 * (1.15 - p * 0.15);
         const height = Math.max(1, this.size * 0.4 * p);
 
-        ctx.save();
-        ctx.globalAlpha = 0.9;
-
-        // Efecto de impacto en el suelo
         rect(this.x - width, this.y + 3, width * 2, 2, "#a4efff");
         rect(this.x - width - 2, this.y + 4, 2, 1, "#f6b4ff");
         rect(this.x + width, this.y + 4, 2, 1, "#f6b4ff");
 
-        // Criatura comprimida horizontalmente
         rect(
             this.x - width,
             this.y - height,
@@ -469,6 +504,7 @@ class Creature {
             Math.max(2, height * 2),
             "#bdeaff"
         );
+
         rect(
             this.x - width + 2,
             this.y - height + 1,
@@ -479,8 +515,6 @@ class Creature {
 
         rect(this.x - 4, this.y - 1, 2, 2, "#27243d");
         rect(this.x + 2, this.y - 1, 2, 2, "#27243d");
-
-        ctx.restore();
     }
 
     containsPoint(x, y) {
@@ -506,18 +540,15 @@ class Creature {
 
         if (distance === 0 || distance >= minDistance) return;
 
-        // Vector normal de la colisión.
         const nx = dx / distance;
         const ny = dy / distance;
-
-        // Se separan para evitar que queden encimados.
         const overlap = minDistance - distance;
+
         this.x -= nx * overlap / 2;
         this.y -= ny * overlap / 2;
         other.x += nx * overlap / 2;
         other.y += ny * overlap / 2;
 
-        // Rebote aproximado intercambiando componentes normales.
         const relativeNormal =
             (this.dx - other.dx) * nx +
             (this.dy - other.dy) * ny;
@@ -529,28 +560,27 @@ class Creature {
             other.dy += relativeNormal * ny;
         }
 
-        // Si se mueven en círculo, cambiar su sentido.
         if (this.movement === "circular") this.angle += Math.PI;
         if (other.movement === "circular") other.angle += Math.PI;
 
-        // Flash azul al chocar.
         this.flash = 0.18;
         other.flash = 0.18;
     }
 }
 
-// --------------------------------------------------
-// CREACIÓN Y REINICIO
-// --------------------------------------------------
+// ================================================
+// CREACIÓN Y CONTADORES
+// ================================================
 
 function createCreatures() {
     creatures = [];
+
     for (let i = 0; i < TOTAL; i++) {
         const creature = new Creature();
         creatures.push(creature);
     }
 
-    // Evitar que todas aparezcan exactamente juntas.
+    // Separar las criaturas al aparecer.
     for (let i = 0; i < creatures.length; i++) {
         for (let j = 0; j < i; j++) {
             const a = creatures[i];
@@ -571,12 +601,17 @@ function updateCounters() {
     remainingElement.textContent = creatures.length;
 }
 
+// ================================================
+// ACTUALIZACIÓN Y DIBUJO
+// ================================================
+
 function startGame() {
     if (running) return;
 
     running = true;
     startMessage.style.display = "none";
     lastTime = 0;
+
     animationId = requestAnimationFrame(gameLoop);
 }
 
@@ -590,6 +625,7 @@ function restartGame() {
 
     score = 0;
     mouse = { x: -100, y: -100, inside: false };
+
     createCreatures();
     drawScene();
 
@@ -600,7 +636,10 @@ function restartGame() {
 function gameLoop(timestamp) {
     if (!running) return;
 
-    const dt = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.04) : 0;
+    const dt = lastTime
+        ? Math.min((timestamp - lastTime) / 1000, 0.04)
+        : 0;
+
     lastTime = timestamp;
 
     update(dt);
@@ -612,7 +651,6 @@ function gameLoop(timestamp) {
 function update(dt) {
     creatures.forEach(creature => creature.update(dt));
 
-    // Revisar las colisiones de todos los pares de criaturas.
     for (let i = 0; i < creatures.length; i++) {
         for (let j = i + 1; j < creatures.length; j++) {
             creatures[i].bounceFrom(creatures[j]);
@@ -621,61 +659,86 @@ function update(dt) {
 }
 
 function drawScene() {
+    if (!canvas.width || !canvas.height) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Trabajar en coordenadas pequeñas para obtener píxeles definidos.
+    // Mantener el escenario 16:9 sin deformarlo.
+    const scale = Math.min(
+        canvas.width / W,
+        canvas.height / H
+    );
+
+    const drawWidth = W * scale;
+    const drawHeight = H * scale;
+
+    const offsetX = (canvas.width - drawWidth) / 2;
+    const offsetY = (canvas.height - drawHeight) / 2;
+
     ctx.save();
-    ctx.scale(3, 3);
+
+    // Fondo exterior si la proporción de la ventana no es 16:9.
+    ctx.fillStyle = "#101329";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
 
     drawBackground();
 
     creatures.forEach(creature => creature.draw());
 
-    if (mouse.inside) drawCustomCursor(mouse.x, mouse.y);
+    if (mouse.inside) {
+        drawCustomCursor(mouse.x, mouse.y);
+    }
 
     ctx.restore();
 }
 
-// --------------------------------------------------
+// ================================================
 // CURSOR PERSONALIZADO: VARITA MÁGICA
-// --------------------------------------------------
+// ================================================
 
 function drawCustomCursor(x, y) {
-    ctx.save();
-
-    // Destello pixelado
     rect(x - 1, y - 8, 2, 3, "#fff2a8");
     rect(x - 7, y - 1, 3, 2, "#ff91d2");
     rect(x + 4, y - 2, 3, 2, "#ff91d2");
     rect(x - 1, y + 5, 2, 3, "#fff2a8");
 
-    // Varita diagonal
     rect(x - 2, y - 3, 3, 3, "#f4d3a0");
     rect(x, y - 5, 3, 3, "#d8b0ff");
     rect(x + 2, y - 7, 3, 3, "#d8b0ff");
     rect(x + 4, y - 9, 3, 3, "#fff0b7");
-
-    // Punta brillante
     rect(x + 5, y - 10, 3, 3, "#ffffff");
-
-    ctx.restore();
 }
 
-// --------------------------------------------------
-// RATÓN Y APLASTAMIENTO
-// --------------------------------------------------
+// ================================================
+// RATÓN Y CLICS
+// ================================================
 
 function getMousePosition(event) {
     const rectCanvas = canvas.getBoundingClientRect();
 
+    const screenX =
+        (event.clientX - rectCanvas.left) / rectCanvas.width * canvas.width;
+
+    const screenY =
+        (event.clientY - rectCanvas.top) / rectCanvas.height * canvas.height;
+
+    const scale = Math.min(
+        canvas.width / W,
+        canvas.height / H
+    );
+
     return {
-        x: (event.clientX - rectCanvas.left) / rectCanvas.width * W,
-        y: (event.clientY - rectCanvas.top) / rectCanvas.height * H
+        x: (screenX - (canvas.width - W * scale) / 2) / scale,
+        y: (screenY - (canvas.height - H * scale) / 2) / scale
     };
 }
 
 canvas.addEventListener("pointermove", event => {
     const pos = getMousePosition(event);
+
     mouse.x = pos.x;
     mouse.y = pos.y;
     mouse.inside = true;
@@ -690,7 +753,6 @@ canvas.addEventListener("pointerdown", event => {
 
     const pos = getMousePosition(event);
 
-    // Buscar desde la última criatura dibujada.
     for (let i = creatures.length - 1; i >= 0; i--) {
         const creature = creatures[i];
 
@@ -703,12 +765,19 @@ canvas.addEventListener("pointerdown", event => {
     }
 });
 
-// --------------------------------------------------
-// MÚSICA AMBIENTAL GENERADA CON WEB AUDIO
-// No necesita archivos de audio externos.
-// --------------------------------------------------
+// ================================================
+// MÚSICA AMBIENTAL
+// ================================================
 
 function stopMusic() {
+    if (audioContext && masterGain) {
+        masterGain.gain.setTargetAtTime(
+            0,
+            audioContext.currentTime,
+            0.1
+        );
+    }
+
     musicNodes.forEach(node => {
         try {
             node.stop();
@@ -716,11 +785,13 @@ function stopMusic() {
     });
 
     musicNodes = [];
+    masterGain = null;
     musicEnabled = false;
+
     musicButton.textContent = "♫ ACTIVAR MÚSICA";
 }
 
-function startMusic() {
+async function startMusic() {
     const AudioContextClass =
         window.AudioContext || window.webkitAudioContext;
 
@@ -733,13 +804,12 @@ function startMusic() {
         audioContext = new AudioContextClass();
     }
 
-    audioContext.resume();
+    await audioContext.resume();
 
-    const master = audioContext.createGain();
-    master.gain.value = 0.035;
-    master.connect(audioContext.destination);
+    masterGain = audioContext.createGain();
+    masterGain.gain.value = 0.035;
+    masterGain.connect(audioContext.destination);
 
-    // Acordes graves y suaves para crear ambiente misterioso.
     [55, 65.41, 82.41].forEach((frequency, index) => {
         const oscillator = audioContext.createOscillator();
         const gain = audioContext.createGain();
@@ -749,33 +819,22 @@ function startMusic() {
         gain.gain.value = index === 0 ? 0.5 : 0.22;
 
         oscillator.connect(gain);
-        gain.connect(master);
+        gain.connect(masterGain);
         oscillator.start();
 
         musicNodes.push(oscillator);
-    });
-
-    musicNodes.push({
-        stop: () => {
-            master.gain.setTargetAtTime(
-                0,
-                audioContext.currentTime,
-                0.1
-            );
-        }
     });
 
     musicEnabled = true;
     musicButton.textContent = "♫ SILENCIAR MÚSICA";
 }
 
-startButton.addEventListener("click", () => {
-    startGame();
-});
+// ================================================
+// BOTONES E INICIALIZACIÓN
+// ================================================
 
-restartButton.addEventListener("click", () => {
-    restartGame();
-});
+startButton.addEventListener("click", startGame);
+restartButton.addEventListener("click", restartGame);
 
 musicButton.addEventListener("click", () => {
     if (musicEnabled) {
@@ -785,6 +844,10 @@ musicButton.addEventListener("click", () => {
     }
 });
 
-// Dibujar el escenario desde el principio.
 createCreatures();
-drawScene();
+
+// Esperar a que el navegador calcule el tamaño real del Canvas.
+requestAnimationFrame(() => {
+    resizeCanvas();
+    drawScene();
+});
