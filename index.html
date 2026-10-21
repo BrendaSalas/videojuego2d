@@ -5,86 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cementerio Pixel | Cazafantasmas</title>
 
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='4' y='1' width='8' height='14' fill='%23f5f0d0'/%3E%3Crect x='6' y='4' width='4' height='3' fill='%23201835'/%3E%3C/svg%3E">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
           rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <header class="container-fluid py-3">
-        <div class="container text-center">
-            <div class="header-icon" aria-hidden="true">🎃</div>
-            <h1>CEMENTERIO PIXEL</h1>
-            <p class="subtitle">Una noche de sustos adorables</p>
-        </div>
-    </header>
+    <main class="game-container">
+        <header class="game-header">
+            <div class="title-decoration">✦ ☾ ✦</div>
+            <h1>CEMENTERIO <span>PIXEL</span></h1>
+            <p class="subtitle">Una noche llena de criaturas extrañas...</p>
+        </header>
 
-    <main class="container-fluid pb-4">
-        <section class="container game-panel">
-            <div class="game-topbar">
-                <div>
-                    <span class="status-dot"></span>
-                    <strong>CAZAFANTASMAS</strong>
+        <section class="game-panel">
+            <div class="game-toolbar">
+                <div class="counter">
+                    <span class="counter-icon">👻</span>
+                    Criaturas:
+                    <strong id="remaining">25</strong>
                 </div>
 
-                <div class="score-box">
-                    <span>CRIATURAS CAZADAS</span>
-                    <span id="score">00</span>
+                <div class="game-status" id="gameStatus">
+                    PREPARA TU VARITA
                 </div>
-            </div>
-
-            <div class="instructions">
-                <span>🖱️ Haz clic en las criaturas para aplastarlas.</span>
-                <span>💥 ¡Rebotan al chocar y reaparecen en otro lugar!</span>
             </div>
 
             <div class="canvas-frame">
-                <canvas id="gameCanvas"
-                        width="960"
-                        height="540"
-                        aria-label="Videojuego de criaturas en un cementerio pixel art">
-                    Tu navegador no soporta Canvas.
+                <canvas id="gameCanvas" width="960" height="540">
+                    Tu navegador no admite Canvas.
                 </canvas>
 
-                <div id="startMessage" class="start-message">
-                    <span>👻</span>
-                    <p>¡LA NOCHE HA COMENZADO!</p>
-                    <button id="startButton" class="btn-pixel">
-                        COMENZAR JUEGO
-                    </button>
+                <div id="startMessage" class="start-overlay">
+                    <div class="start-card">
+                        <div class="start-ghost">👻</div>
+                        <h2>¡BIENVENIDA AL CEMENTERIO!</h2>
+                        <p>Encuentra a las criaturas y haz clic sobre ellas.</p>
+                        <p class="small-instruction">
+                            Ten cuidado... algo te observa desde la oscuridad.
+                        </p>
+                        <button id="startButton" class="pixel-button">
+                            COMENZAR JUEGO
+                        </button>
+                    </div>
+                </div>
+
+                <div id="screamerOverlay" class="screamer-overlay"
+                     aria-hidden="true">
+                    <div class="screamer-art" id="screamerArt"></div>
+                    <div class="screamer-text">¡TE ENCONTRÉ!</div>
                 </div>
             </div>
 
             <div class="game-controls">
-                <button id="musicButton" class="control-button">
+                <button id="musicButton" class="pixel-button secondary">
                     ♫ ACTIVAR MÚSICA
                 </button>
 
-                <button id="restartButton" class="control-button">
+                <button id="restartButton" class="pixel-button">
                     ↻ REINICIAR
                 </button>
+            </div>
 
-                <div class="remaining">
-                    CRIATURAS EN ESCENA:
-                    <strong id="remaining">25</strong>
-                </div>
+            <div class="game-help">
+                <span>🪄 Haz clic en las criaturas para atraparlas.</span>
+                <span>☠ No confíes en el silencio...</span>
             </div>
         </section>
+
+        <footer class="game-footer">
+            <span>✦ PIXEL HORROR ✦</span>
+            <span>Explora bajo tu propio riesgo</span>
+        </footer>
     </main>
 
-    <footer class="container-fluid">
-        <div class="container text-center py-3">
-            <p class="footer-title">CEMENTERIO PIXEL © 2026</p>
-            <p class="mb-1">Proyecto de Graficación — Ingeniería en Sistemas Computacionales</p>
-            <p class="mb-0">Alumna: Brenda Lisseth Salas Escamilla</p>
-            <p class="mb-0">Instituto Tecnológico de Pachuca</p>
-        </div>
-    </footer>
-
-    <!-- Coloca los archivos de audio en la carpeta audio -->
+    <!-- Archivos de audio locales -->
     <audio id="backgroundMusic" src="audio/terror.mp3"
            loop preload="auto"></audio>
 
