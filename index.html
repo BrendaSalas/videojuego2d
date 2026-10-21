@@ -3,90 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cementerio Pixel</title>
+    <title>Cementerio Pixel | Cazafantasmas</title>
 
-    <link rel="icon" href="data:,">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='4' y='1' width='8' height='14' fill='%23f5f0d0'/%3E%3Crect x='6' y='4' width='4' height='3' fill='%23201835'/%3E%3C/svg%3E">
 
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <main id="game">
-        <header class="game-header">
-            <h1>CEMENTERIO <span>PIXEL</span></h1>
-            <p class="subtitle">✦ NO DESPIERTES A LOS MUERTOS ✦</p>
-        </header>
+    <header class="container-fluid py-3">
+        <div class="container text-center">
+            <div class="header-icon" aria-hidden="true">🎃</div>
+            <h1>CEMENTERIO PIXEL</h1>
+            <p class="subtitle">Una noche de sustos adorables</p>
+        </div>
+    </header>
 
-        <section class="game-frame">
-            <canvas id="gameCanvas" width="960" height="540"
-                    aria-label="Juego de terror en pixel art"></canvas>
+    <main class="container-fluid pb-4">
+        <section class="container game-panel">
+            <div class="game-topbar">
+                <div>
+                    <span class="status-dot"></span>
+                    <strong>CAZAFANTASMAS</strong>
+                </div>
 
-            <div id="startOverlay" class="overlay">
-                <div class="overlay-box">
-                    <p class="moon">☾</p>
-                    <h2>BIENVENIDA</h2>
-                    <p>La noche está llena de criaturas...</p>
-                    <p>Haz clic en ellas antes de que desaparezcan.</p>
-                    <button id="startButton" class="pixel-button">
-                        ENTRAR AL CEMENTERIO
+                <div class="score-box">
+                    <span>CRIATURAS CAZADAS</span>
+                    <span id="score">00</span>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <span>🖱️ Haz clic en las criaturas para aplastarlas.</span>
+                <span>💥 ¡Rebotan al chocar y reaparecen en otro lugar!</span>
+            </div>
+
+            <div class="canvas-frame">
+                <canvas id="gameCanvas"
+                        width="960"
+                        height="540"
+                        aria-label="Videojuego de criaturas en un cementerio pixel art">
+                    Tu navegador no soporta Canvas.
+                </canvas>
+
+                <div id="startMessage" class="start-message">
+                    <span>👻</span>
+                    <p>¡LA NOCHE HA COMENZADO!</p>
+                    <button id="startButton" class="btn-pixel">
+                        COMENZAR JUEGO
                     </button>
-                    <small>PRECAUCIÓN: PUEDEN APARECER SORPRESAS</small>
                 </div>
             </div>
 
-            <div id="screamerOverlay" class="screamer-overlay" aria-hidden="true">
-                <div class="screamer-face">
-                    <div class="screamer-horns">
-                        <span></span><span></span>
-                    </div>
-                    <div class="screamer-eyes">
-                        <span></span><span></span>
-                    </div>
-                    <div class="screamer-nose"></div>
-                    <div class="screamer-mouth">
-                        <div class="screamer-teeth"></div>
-                    </div>
+            <div class="game-controls">
+                <button id="musicButton" class="control-button">
+                    ♫ ACTIVAR MÚSICA
+                </button>
+
+                <button id="restartButton" class="control-button">
+                    ↻ REINICIAR
+                </button>
+
+                <div class="remaining">
+                    CRIATURAS EN ESCENA:
+                    <strong id="remaining">25</strong>
                 </div>
-                <p class="screamer-text">¡TE ENCONTRÉ!</p>
             </div>
         </section>
-
-        <section class="controls">
-            <div class="stat">
-                <span class="stat-label">ATRAPADAS</span>
-                <span id="score">00</span>
-            </div>
-
-            <div class="stat">
-                <span class="stat-label">CRIATURAS</span>
-                <span id="remaining">25</span>
-            </div>
-
-            <button id="musicButton" class="pixel-button small-button">
-                ♫ ACTIVAR MÚSICA
-            </button>
-
-            <button id="restartButton" class="pixel-button small-button">
-                ↻ REINICIAR
-            </button>
-        </section>
-
-        <footer>
-            <p>☠ CUIDADO CON LO QUE SE ESCONDE EN LA OSCURIDAD ☠</p>
-        </footer>
     </main>
 
-    <audio id="backgroundMusic"
-           src="audio/terror.mp3"
-           loop
-           preload="auto"></audio>
+    <footer class="container-fluid">
+        <div class="container text-center py-3">
+            <p class="footer-title">CEMENTERIO PIXEL © 2026</p>
+            <p class="mb-1">Proyecto de Graficación — Ingeniería en Sistemas Computacionales</p>
+            <p class="mb-0">Alumna: Brenda Lisseth Salas Escamilla</p>
+            <p class="mb-0">Instituto Tecnológico de Pachuca</p>
+        </div>
+    </footer>
 
-    <audio id="screamerAudio"
-           src="audio/screamer.mp3"
+    <!-- Coloca los archivos de audio en la carpeta audio -->
+    <audio id="backgroundMusic" src="audio/terror.mp3"
+           loop preload="auto"></audio>
+
+    <audio id="screamerAudio" src="audio/screamer.mp3"
            preload="auto"></audio>
 
     <script src="script.js"></script>
