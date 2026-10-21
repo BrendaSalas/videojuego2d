@@ -4,68 +4,90 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cementerio Pixel</title>
+
+    <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <main id="game">
-        <header class="top-bar">
-            <div class="title">
-                <span class="skull">☠</span>
-                <h1>CEMENTERIO PIXEL</h1>
-                <span class="skull">☠</span>
-            </div>
-
-            <div class="game-info">
-                <span class="score">
-                    ALMAS ATRAPADAS: <strong id="score">0</strong>
-                </span>
-                <span id="status">PRESIONA INICIAR</span>
-            </div>
+        <header class="game-header">
+            <h1>CEMENTERIO <span>PIXEL</span></h1>
+            <p class="subtitle">✦ NO DESPIERTES A LOS MUERTOS ✦</p>
         </header>
 
-        <section id="game-area">
-            <canvas
-                id="gameCanvas"
-                width="320"
-                height="180"
-                aria-label="Videojuego de criaturas pixel art en un cementerio">
-            </canvas>
+        <section class="game-frame">
+            <canvas id="gameCanvas" width="960" height="540"
+                    aria-label="Juego de terror en pixel art"></canvas>
 
-            <div id="startOverlay">
+            <div id="startOverlay" class="overlay">
                 <div class="overlay-box">
-                    <div class="overlay-skull">☠</div>
-                    <h2>CEMENTERIO PIXEL</h2>
-                    <p>¿Te atreves a entrar?</p>
-                    <button id="startButton">▶ INICIAR JUEGO</button>
+                    <p class="moon">☾</p>
+                    <h2>BIENVENIDA</h2>
+                    <p>La noche está llena de criaturas...</p>
+                    <p>Haz clic en ellas antes de que desaparezcan.</p>
+                    <button id="startButton" class="pixel-button">
+                        ENTRAR AL CEMENTERIO
+                    </button>
+                    <small>PRECAUCIÓN: PUEDEN APARECER SORPRESAS</small>
                 </div>
+            </div>
+
+            <div id="screamerOverlay" class="screamer-overlay" aria-hidden="true">
+                <div class="screamer-face">
+                    <div class="screamer-horns">
+                        <span></span><span></span>
+                    </div>
+                    <div class="screamer-eyes">
+                        <span></span><span></span>
+                    </div>
+                    <div class="screamer-nose"></div>
+                    <div class="screamer-mouth">
+                        <div class="screamer-teeth"></div>
+                    </div>
+                </div>
+                <p class="screamer-text">¡TE ENCONTRÉ!</p>
             </div>
         </section>
 
-        <footer class="bottom-bar">
-            <div class="controls">
-                <button id="restartButton">↻ REINICIAR</button>
-                <button id="musicButton">♫ ACTIVAR MÚSICA</button>
+        <section class="controls">
+            <div class="stat">
+                <span class="stat-label">ATRAPADAS</span>
+                <span id="score">00</span>
             </div>
 
-            <p class="instructions">
-                ATRAPA LAS CRIATURAS · ¡CUIDADO CON LOS SUSTOS!
-            </p>
-            <p class="credits">Una noche de terror en pixel art</p>
+            <div class="stat">
+                <span class="stat-label">CRIATURAS</span>
+                <span id="remaining">25</span>
+            </div>
+
+            <button id="musicButton" class="pixel-button small-button">
+                ♫ ACTIVAR MÚSICA
+            </button>
+
+            <button id="restartButton" class="pixel-button small-button">
+                ↻ REINICIAR
+            </button>
+        </section>
+
+        <footer>
+            <p>☠ CUIDADO CON LO QUE SE ESCONDE EN LA OSCURIDAD ☠</p>
         </footer>
     </main>
 
-    <audio
-        id="backgroundMusic"
-        src="audio/terror.mp3"
-        loop
-        preload="auto">
-    </audio>
+    <audio id="backgroundMusic"
+           src="audio/terror.mp3"
+           loop
+           preload="auto"></audio>
 
-    <audio
-        id="screamerAudio"
-        src="audio/screamer.mp3"
-        preload="auto">
-    </audio>
+    <audio id="screamerAudio"
+           src="audio/screamer.mp3"
+           preload="auto"></audio>
 
     <script src="script.js"></script>
 </body>
