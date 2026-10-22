@@ -1,10 +1,3 @@
-
-"use strict";
-
-// =====================================================
-// CEMENTERIO PIXEL - CONFIGURACIÓN GENERAL
-// =====================================================
-
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -14,1224 +7,764 @@ const startMessage = document.getElementById("startMessage");
 const startButton = document.getElementById("startButton");
 const restartButton = document.getElementById("restartButton");
 const musicButton = document.getElementById("musicButton");
-const gameStatus = document.getElementById("gameStatus");
 
-const backgroundMusic = document.getElementById("backgroundMusic");
-const screamerAudio = document.getElementById("screamerAudio");
-const screamerOverlay = document.getElementById("screamerOverlay");
-
-const WIDTH = 960;
-const HEIGHT = 540;
-const TARGET_CREATURES = 25;
-
-canvas.width = WIDTH;
-canvas.height = HEIGHT;
-
-let score = 0;
-let gameStarted = false;
-let gameRunning = false;
-let musicEnabled = false;
-let animationFrame = null;
-let lastFrameTime = 0;
-let nextScreamerTime = 0;
-let screamerActive = false;
-let screamerTimeout = null;
-let lastScreamerAt = 0;
+const W = 320;
+const H = 180;
+const TOTAL = 25;
 
 let creatures = [];
 let particles = [];
-let backgroundImage = new Image();
-let backgroundLoaded = false;
+let score = 0;
+let running = false;
+let animationId = null;
+let lastTime = 0;
+let mouse = { x: -100, y: -100, inside: false };
 
-// =====================================================
-// FONDO DEL CEMENTERIO
-// =====================================================
+// --------------------------------------------------
+// CARGA DE ARCHIVOS DE AUDIO EXTERNOS
+// --------------------------------------------------
+const bgMusic = new Audio("assets/terror.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.4; // Ajusta el volumen general de la música (0.0 a 1.0)
 
-backgroundImage.src = "cementerio.png";
+const screamerSFX = new Audio("assets/screamer.mp3");
+screamerSFX.volume = 0.8; // Ajusta el volumen del susto
 
-backgroundImage.onload = () => {
-    backgroundLoaded = true;
+let musicEnabled = false;
+
+// Variables del Screamer Pixel Art
+let screamerActive = false;
+let screamerTimer = 0;
+let screamerFlash = false;
+let nextScreamerTime = 0;
+
+const colors = {
+    ghost: "#e9f4e9",
+    pinkGhost: "#ff9bd5",
+    mint: "#a6ffd1",
+    pumpkin: "#ff9b43",
+    purple: "#bb91ff",
+    zombie: "#a5dc78"
 };
 
-backgroundImage.onerror = () => {
-    backgroundLoaded = false;
-    console.warn(
-        "No se encontró cementerio.png. Se utilizará el fondo dibujado."
-    );
-};
+const rand = (min, max) => Math.random() * (max - min) + min;
+const choice = arr => arr[Math.floor(Math.random() * arr.length)];
+
+function rect(x, y, w, h, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+}
+
+// --------------------------------------------------
+// FONDO PIXEL ART: CEMENTERIO NOCTURNO
+// --------------------------------------------------
 
 function drawBackground() {
-    if (backgroundLoaded) {
-        const imageRatio = backgroundImage.width / backgroundImage.height;
-        const canvasRatio = WIDTH / HEIGHT;
-
-        let drawWidth;
-        let drawHeight;
-        let offsetX;
-        let offsetY;
-
-        if (imageRatio > canvasRatio) {
-            drawHeight = HEIGHT;
-            drawWidth = HEIGHT * imageRatio;
-            offsetX = (WIDTH - drawWidth) / 2;
-            offsetY = 0;
-        } else {
-            drawWidth = WIDTH;
-            drawHeight = WIDTH / imageRatio;
-            offsetX = 0;
-            offsetY = (HEIGHT - drawHeight) / 2;
-        }
-
-        ctx.drawImage(
-            backgroundImage,
-            offsetX,
-            offsetY,
-            drawWidth,
-            drawHeight
-        );
-
-        // Oscurecer el fondo para dar ambiente nocturno.
-        ctx.fillStyle = "rgba(8, 6, 24, 0.43)";
-        ctx.fillRect(0, 0, WIDTH, HEIGHT);
-    } else {
-        drawFallbackBackground();
-    }
-
-    drawFog();
-    drawVignette();
-}
-
-function drawFallbackBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-    gradient.addColorStop(0, "#11152c");
-    gradient.addColorStop(0.55, "#28203a");
-    gradient.addColorStop(1, "#080b13");
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    rect(0, 0, W, H, "#11142d");
+    rect(0, 0, W, 85, "#171a38");
+    rect(0, 85, W, 55, "#20213a");
 
     // Luna
-    ctx.fillStyle = "#ded9ef";
-    ctx.beginPath();
-    ctx.arc(775, 92, 37, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#bcb4d8";
-    ctx.beginPath();
-    ctx.arc(790, 80, 33, 0, Math.PI * 2);
-    ctx.fill();
+    rect(239, 13, 23, 23, "#b9c8d7");
+    rect(235, 18, 4, 13, "#b9c8d7");
+    rect(244, 9, 13, 4, "#b9c8d7");
+    rect(244, 17, 5, 5, "#8798b2");
+    rect(251, 26, 5, 4, "#8798b2");
+    rect(239, 31, 5, 5, "#8798b2");
 
     // Estrellas
-    for (let i = 0; i < 45; i++) {
-        const x = (i * 137 + 43) % WIDTH;
-        const y = (i * 61 + 17) % 250;
-
-        ctx.fillStyle = i % 3 === 0 ? "#e5c9ff" : "#aaa9d2";
-        ctx.fillRect(x, y, i % 4 === 0 ? 3 : 2, i % 4 === 0 ? 3 : 2);
+    for (let i = 0; i < 35; i++) {
+        const x = (i * 47 + 13) % W;
+        const y = (i * 29 + 7) % 68;
+        rect(x, y, i % 4 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1,
+            i % 3 === 0 ? "#f7d9a1" : "#a7b9e9");
     }
 
-    // Siluetas de árboles.
-    for (let i = 0; i < 9; i++) {
-        const x = i * 125 + 10;
-        const treeHeight = 130 + (i % 3) * 28;
+    // Nubes
+    rect(22, 24, 31, 5, "#252746");
+    rect(14, 29, 43, 4, "#252746");
+    rect(70, 43, 24, 4, "#222640");
+    rect(63, 47, 35, 4, "#222640");
+    rect(175, 27, 29, 4, "#252746");
+    rect(184, 31, 31, 4, "#252746");
 
-        ctx.fillStyle = "#11131e";
-        ctx.fillRect(x, HEIGHT - treeHeight, 12, treeHeight);
-
-        ctx.beginPath();
-        ctx.moveTo(x - 42, HEIGHT - treeHeight + 65);
-        ctx.lineTo(x + 6, HEIGHT - treeHeight - 25);
-        ctx.lineTo(x + 51, HEIGHT - treeHeight + 65);
-        ctx.closePath();
-        ctx.fill();
+    // Árboles lejanos / Montañas
+    rect(0, 72, 320, 18, "#202a3c");
+    for (let x = -5; x < W; x += 19) {
+        rect(x + 6, 48 + (x % 3) * 3, 4, 36, "#111a29");
+        rect(x, 58 + (x % 2) * 4, 16, 17, "#182438");
+        rect(x + 3, 51 + (x % 2) * 3, 10, 14, "#182438");
+        rect(x + 6, 44 + (x % 3), 5, 12, "#182438");
     }
 
-    // Suelo
-    ctx.fillStyle = "#171b24";
-    ctx.fillRect(0, 390, WIDTH, 150);
+    // Terreno y camino
+    rect(0, 88, W, 92, "#29283b");
+    rect(0, 91, W, 5, "#3a3948");
+    rect(0, 96, W, 4, "#323246");
+
+    rect(133, 95, 44, 85, "#454252");
+    rect(141, 95, 29, 85, "#514b58");
+    for (let y = 98; y < H; y += 12) {
+        rect(136, y, 7, 1, "#29283b");
+        rect(159, y + 5, 10, 1, "#393547");
+    }
 
     // Lápidas
+    drawGrave(18, 80, 17, 25, "#77748a", "#47465e");
+    drawGrave(65, 85, 18, 27, "#77748a", "#4c4961");
+    drawGrave(108, 81, 17, 24, "#66667d", "#44445c");
+    drawGrave(202, 83, 19, 27, "#77748a", "#49465e");
+    drawGrave(277, 80, 19, 29, "#858095", "#514a65");
+
+    rect(24, 83, 3, 8, "#c5b9a4");
+    rect(21, 85, 9, 3, "#c5b9a4");
+    rect(285, 83, 3, 9, "#d0bfa9");
+    rect(282, 86, 9, 3, "#d0bfa9");
+
+    drawDeadTree(5, 48, 1);
+    drawDeadTree(302, 46, -1);
+
+    // Vallas
+    for (let x = 0; x < 64; x += 9) {
+        rect(x, 112, 3, 18, "#65506d");
+        rect(x - 2, 116, 7, 3, "#87677b");
+    }
+    rect(0, 114, 65, 3, "#87677b");
+    rect(0, 125, 65, 3, "#654a68");
+
+    for (let x = 248; x < 320; x += 9) {
+        rect(x, 116, 3, 16, "#65506d");
+        rect(x - 2, 119, 7, 3, "#87677b");
+    }
+    rect(247, 117, 73, 3, "#87677b");
+    rect(247, 129, 73, 3, "#654a68");
+
+    drawPumpkin(77, 143, 0.8);
+    drawPumpkin(257, 139, 0.7);
+
+    // Plantas y niebla
+    for (let i = 0; i < 22; i++) {
+        const x = (i * 53 + 16) % W;
+        const y = 105 + (i * 17) % 69;
+        rect(x, y, 2, 5, "#527c54");
+        rect(x - 2, y + 1, 2, 2, "#e49ab8");
+        rect(x + 2, y + 2, 2, 2, "#b8a0ff");
+    }
+
+    rect(0, 105, 42, 4, "#77768b");
+    rect(11, 109, 48, 3, "#53536e");
+    rect(244, 105, 35, 3, "#77768b");
+    rect(269, 108, 42, 4, "#53536e");
+}
+
+function drawGrave(x, y, w, h, front, shadow) {
+    rect(x + 3, y + h, w + 2, 3, "#171827");
+    rect(x + 2, y + 3, w, h - 2, shadow);
+    rect(x, y + 5, w, h - 5, front);
+    rect(x + 2, y + 1, w - 4, 7, front);
+    rect(x + 4, y, w - 8, 3, front);
+    rect(x + 3, y + 7, 2, h - 11, "#aaa0ad");
+    rect(x + 5, y + 11, w - 10, 2, shadow);
+    rect(x + 5, y + 16, w - 10, 2, shadow);
+}
+
+function drawDeadTree(x, y, direction) {
+    rect(x + 4, y + 25, 6, 65, "#382b3a");
+    rect(x + 2, y + 39, 4, 18, "#382b3a");
+    rect(x + 3, y + 26, 3, 4, "#76506b");
+
+    rect(x + 5, y + 30, direction * 17, 4, "#382b3a");
+    rect(x + 5 + direction * 16, y + 19, 3, 15, "#382b3a");
+    rect(x + 5 + direction * 16, y + 17, direction * 8, 3, "#382b3a");
+
+    rect(x + 7, y + 44, direction * 13, 3, "#382b3a");
+    rect(x + 7 + direction * 12, y + 36, 3, 11, "#382b3a");
+    rect(x + 7 + direction * 12, y + 34, direction * 8, 3, "#382b3a");
+}
+
+function drawPumpkin(x, y, scale = 1) {
+    const s = scale;
+    rect(x + 4*s, y, 5*s, 3*s, "#59794b");
+    rect(x + 2*s, y + 3*s, 10*s, 8*s, "#d96c35");
+    rect(x, y + 5*s, 14*s, 5*s, "#f18b3c");
+    rect(x + 4*s, y + 4*s, 2*s, 7*s, "#ffb65a");
+    rect(x + 9*s, y + 4*s, 2*s, 7*s, "#b95631");
+    rect(x + 3*s, y + 6*s, 2*s, 2*s, "#42243a");
+    rect(x + 9*s, y + 6*s, 2*s, 2*s, "#42243a");
+    rect(x + 5*s, y + 8*s, 4*s, 2*s, "#42243a");
+}
+
+// --------------------------------------------------
+// SISTEMA DE PARTÍCULAS
+// --------------------------------------------------
+function createSplatter(x, y, color) {
     for (let i = 0; i < 8; i++) {
-        const x = i * 132 + 20;
-        const y = 410 + (i % 2) * 30;
-
-        ctx.fillStyle = "#3c3d50";
-        ctx.fillRect(x, y, 48, 70);
-        ctx.fillRect(x + 8, y - 10, 32, 10);
-
-        ctx.fillStyle = "#5b5b70";
-        ctx.fillRect(x + 7, y + 9, 3, 42);
-
-        ctx.fillStyle = "#9691ae";
-        ctx.fillRect(x + 18, y + 17, 12, 3);
-        ctx.fillRect(x + 22, y + 13, 4, 12);
+        particles.push({
+            x: x,
+            y: y,
+            vx: rand(-30, 30),
+            vy: rand(-20, 10),
+            color: color,
+            life: rand(0.2, 0.4)
+        });
     }
 }
 
-function drawFog() {
-    const fog = ctx.createLinearGradient(0, 360, 0, HEIGHT);
-    fog.addColorStop(0, "rgba(119, 111, 163, 0)");
-    fog.addColorStop(0.55, "rgba(113, 103, 145, 0.09)");
-    fog.addColorStop(1, "rgba(151, 129, 174, 0.13)");
-
-    ctx.fillStyle = fog;
-    ctx.fillRect(0, 330, WIDTH, 210);
-}
-
-function drawVignette() {
-    const gradient = ctx.createRadialGradient(
-        WIDTH / 2,
-        HEIGHT / 2,
-        80,
-        WIDTH / 2,
-        HEIGHT / 2,
-        610
-    );
-
-    gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
-    gradient.addColorStop(1, "rgba(0, 0, 8, 0.48)");
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-}
-
-// =====================================================
-// UTILIDADES
-// =====================================================
-
-function random(min, max) {
-    return Math.random() * (max - min) + min;
-}
-
-function randomInt(min, max) {
-    return Math.floor(random(min, max + 1));
-}
-
-function distanceBetween(a, b) {
-    return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function updateScore() {
-    scoreElement.textContent = score;
-    remainingElement.textContent = creatures.filter(
-        creature => !creature.squashing && !creature.dead
-    ).length;
-}
-
-// =====================================================
-// PARTÍCULAS MÁGICAS
-// =====================================================
-
-class Particle {
-    constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        this.vx = random(-2.4, 2.4);
-        this.vy = random(-3, 1.2);
-        this.life = random(18, 38);
-        this.maxLife = this.life;
-        this.size = randomInt(2, 5);
-    }
-
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy += 0.035;
-        this.life--;
-    }
-
-    draw() {
-        if (this.life <= 0) return;
-
-        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
-        ctx.fillStyle = this.color;
-        ctx.fillRect(
-            Math.round(this.x),
-            Math.round(this.y),
-            this.size,
-            this.size
-        );
-        ctx.globalAlpha = 1;
+function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
     }
 }
 
-function createParticles(x, y, color, amount = 12) {
-    for (let i = 0; i < amount; i++) {
-        particles.push(new Particle(x, y, color));
-    }
+function drawParticles() {
+    particles.forEach(p => rect(p.x, p.y, 2, 2, p.color));
 }
 
-// =====================================================
-// CRIATURAS
-// =====================================================
-
-const CREATURE_TYPES = ["ghost", "pumpkin", "bat", "zombie", "cat"];
-
-const PALETTES = {
-    ghost: ["#e8e1ff", "#d7ccf6", "#fff0f8", "#bba7e8"],
-    pumpkin: ["#f59a45", "#ffb957", "#dc6b37", "#ffcf76"],
-    bat: ["#7566a7", "#a99ad9", "#53466e", "#d8c6ff"],
-    zombie: ["#80a96d", "#a4c58a", "#4b6e4c", "#c5d9a5"],
-    cat: ["#d5a1c4", "#f2c4dc", "#a976b0", "#f9d9e9"]
-};
+// --------------------------------------------------
+// CLASE CRIATURA
+// --------------------------------------------------
 
 class Creature {
-    constructor(x, y, type, size, color, speedX, speedY) {
-        this.x = x;
-        this.y = y;
-        this.type = type;
-        this.size = size;
-        this.color = color;
-        this.speedX = speedX;
-        this.speedY = speedY;
-
-        this.radius = size * 0.53;
-        this.squashing = false;
-        this.squashTimer = 0;
-        this.dead = false;
-        this.animationOffset = random(0, Math.PI * 2);
-        this.blinkTimer = randomInt(100, 260);
-        this.blinking = false;
-        this.hitFlash = 0;
+    constructor() {
+        this.respawn(true);
     }
 
-    update(delta) {
-        if (this.dead) return;
+    respawn(initial = false) {
+        this.x = rand(10, W - 10);
+        this.y = rand(18, H - 12);
+        this.size = rand(8, 12);
+        this.speed = rand(18, 39);
+        this.type = choice(["ghost", "pumpkin", "bat", "zombie", "cat"]);
+        this.movement = choice(["up", "down", "diagonal", "circular"]);
+        this.color = choice(Object.values(colors));
+        this.angle = rand(0, Math.PI * 2);
+        this.phase = rand(0, Math.PI * 2);
+        this.flash = 0;
+        this.squash = 0;
+        this.squashTimer = 0;
+        this.opacity = 1;
+        this.fadeDirection = 0;
+        this.radius = this.size * 0.7;
+        this.dx = rand(-1, 1);
+        this.dy = rand(-1, 1);
 
-        if (this.squashing) {
-            this.squashTimer -= delta;
+        if (this.movement === "up") { this.dx = 0; this.dy = -1; }
+        else if (this.movement === "down") { this.dx = 0; this.dy = 1; }
+        else if (this.movement === "diagonal") {
+            const sign = Math.random() < 0.5 ? -1 : 1;
+            this.dx = sign;
+            this.dy = sign * (Math.random() < 0.5 ? 1 : -1);
+        }
 
+        const length = Math.hypot(this.dx, this.dy) || 1;
+        this.dx /= length;
+        this.dy /= length;
+
+        if (!initial) {
+            this.x = rand(12, W - 12);
+            this.y = rand(22, H - 12);
+        }
+    }
+
+    update(dt) {
+        if (this.squash > 0) {
+            this.squashTimer -= dt;
             if (this.squashTimer <= 0) {
-                this.dead = true;
+                this.squash = 0;
+                this.respawn();
             }
             return;
         }
 
-        const step = delta / 16.67;
+        this.phase += dt * 4;
+        this.flash = Math.max(0, this.flash - dt);
 
-        this.x += this.speedX * step;
-        this.y += this.speedY * step;
+        const velocity = this.speed * dt;
 
-        // Mantener a las criaturas dentro del área de juego.
-        if (this.x - this.radius < 0) {
-            this.x = this.radius;
-            this.speedX = Math.abs(this.speedX);
+        if (this.movement === "circular") {
+            this.angle += dt * (1.1 + this.speed / 40);
+            this.x += Math.cos(this.angle) * velocity;
+            this.y += Math.sin(this.angle) * velocity;
+        } else {
+            if (Math.random() < 0.018) {
+                this.dx += rand(-0.25, 0.25);
+                this.dy += rand(-0.25, 0.25);
+                const length = Math.hypot(this.dx, this.dy) || 1;
+                this.dx /= length;
+                this.dy /= length;
+            }
+
+            this.x += this.dx * velocity;
+            this.y += this.dy * velocity;
         }
 
-        if (this.x + this.radius > WIDTH) {
-            this.x = WIDTH - this.radius;
-            this.speedX = -Math.abs(this.speedX);
+        if (this.fadeDirection === 0 && Math.random() < 0.0008) {
+            this.fadeDirection = 1;
         }
 
-        if (this.y - this.radius < 145) {
-            this.y = 145 + this.radius;
-            this.speedY = Math.abs(this.speedY);
+        if (this.fadeDirection !== 0) {
+            this.opacity -= this.fadeDirection * dt * 2.5;
+
+            if (this.opacity <= 0) {
+                this.opacity = 0;
+                this.respawn();
+                this.opacity = 0;
+                this.fadeDirection = -1;
+            } else if (this.opacity >= 1) {
+                this.opacity = 1;
+                this.fadeDirection = 0;
+            }
         }
 
-        if (this.y + this.radius > HEIGHT - 25) {
-            this.y = HEIGHT - 25 - this.radius;
-            this.speedY = -Math.abs(this.speedY);
+        const margin = this.size + 2;
+
+        if (this.x < margin) {
+            this.x = margin;
+            this.dx = Math.abs(this.dx);
+            this.flash = 0.12;
+        } else if (this.x > W - margin) {
+            this.x = W - margin;
+            this.dx = -Math.abs(this.dx);
+            this.flash = 0.12;
         }
 
-        this.blinkTimer -= step;
-
-        if (this.blinkTimer <= 0) {
-            this.blinking = !this.blinking;
-            this.blinkTimer = this.blinking ? 7 : randomInt(90, 230);
-        }
-
-        if (this.hitFlash > 0) {
-            this.hitFlash -= step;
+        if (this.y < margin + 5) {
+            this.y = margin + 5;
+            this.dy = Math.abs(this.dy);
+            this.flash = 0.12;
+        } else if (this.y > H - margin) {
+            this.y = H - margin;
+            this.dy = -Math.abs(this.dy);
+            this.flash = 0.12;
         }
     }
 
     draw() {
-        if (this.dead) return;
+        if (this.squash > 0) {
+            this.drawSquashed();
+            return;
+        }
 
         ctx.save();
-        ctx.translate(Math.round(this.x), Math.round(this.y));
+        ctx.globalAlpha = this.opacity;
 
-        const bob = this.squashing ? 0 : Math.sin(
-            performance.now() * 0.003 + this.animationOffset
-        ) * 1.4;
+        const x = Math.round(this.x);
+        const y = Math.round(this.y + Math.sin(this.phase) * 1.2);
+        const s = this.size / 10;
 
-        ctx.translate(0, bob);
+        rect(x - 5*s, y + 5*s, 10*s, 2*s, "#10101d");
 
-        let squashX = 1;
-        let squashY = 1;
-
-        if (this.squashing) {
-            const progress = Math.max(0, this.squashTimer / 240);
-            squashX = 1 + (1 - progress) * 0.48;
-            squashY = 0.15 + progress * 0.85;
-        }
-
-        ctx.scale(squashX, squashY);
-
-        // Sombra de la criatura.
-        ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
-        ctx.fillRect(
-            -this.size * 0.43,
-            this.size * 0.39,
-            this.size * 0.86,
-            this.size * 0.18
-        );
-
-        switch (this.type) {
-            case "ghost":
-                this.drawGhost();
-                break;
-            case "pumpkin":
-                this.drawPumpkin();
-                break;
-            case "bat":
-                this.drawBat();
-                break;
-            case "zombie":
-                this.drawZombie();
-                break;
-            case "cat":
-                this.drawCat();
-                break;
-        }
-
-        // Destello al chocar.
-        if (this.hitFlash > 0) {
-            ctx.globalAlpha = Math.min(0.45, this.hitFlash * 0.1);
-            ctx.fillStyle = "#9defff";
-            ctx.fillRect(
-                -this.size * 0.5,
-                -this.size * 0.5,
-                this.size,
-                this.size
-            );
+        if (this.flash > 0) {
+            rect(x - 8*s, y - 8*s, 16*s, 16*s, "#83d9ff");
+            rect(x - 6*s, y - 6*s, 12*s, 12*s, "#d8f6ff");
+        } else {
+            this.drawSprite(x, y, s);
         }
 
         ctx.restore();
-        ctx.globalAlpha = 1;
     }
 
-    // -------------------------------------------------
-    // FANTASMA
-    // -------------------------------------------------
+    drawSprite(x, y, s) {
+        switch (this.type) {
+            case "ghost": this.drawGhost(x, y, s, this.color); break;
+            case "pumpkin": this.drawPumpkinCreature(x, y, s); break;
+            case "bat": this.drawBat(x, y, s); break;
+            case "zombie": this.drawZombie(x, y, s); break;
+            case "cat": this.drawCat(x, y, s); break;
+        }
+    }
 
-    drawGhost() {
-        const u = this.size / 12;
+    drawGhost(x, y, s, color) {
+        rect(x - 4*s, y - 6*s, 8*s, 2*s, color);
+        rect(x - 6*s, y - 4*s, 12*s, 8*s, color);
+        rect(x - 5*s, y + 4*s, 3*s, 3*s, color);
+        rect(x, y + 4*s, 3*s, 3*s, color);
+        rect(x + 4*s, y + 3*s, 2*s, 2*s, color);
 
-        ctx.fillStyle = "#9d8ec9";
-        ctx.fillRect(-4 * u, -4 * u, 8 * u, 7 * u);
+        rect(x - 5*s, y + 1*s, 2*s, 2*s, "#ff9bbd");
+        rect(x + 3*s, y + 1*s, 2*s, 2*s, "#ff9bbd");
 
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-4.5 * u, -4.3 * u, 9 * u, 6.8 * u);
-        ctx.fillRect(-5 * u, -2.1 * u, 1.2 * u, 2.3 * u);
-        ctx.fillRect(3.8 * u, -2.1 * u, 1.2 * u, 2.3 * u);
+        rect(x - 3*s, y - 2*s, 2*s, 3*s, "#27243d");
+        rect(x + 2*s, y - 2*s, 2*s, 3*s, "#27243d");
+        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#6e6481");
+    }
 
-        // Parte inferior ondulada.
-        ctx.fillStyle = "#d7c9f6";
-        ctx.fillRect(-4.5 * u, 2 * u, 2 * u, 1 * u);
-        ctx.fillRect(-1 * u, 2 * u, 2 * u, 1 * u);
-        ctx.fillRect(2.5 * u, 2 * u, 2 * u, 1 * u);
+    drawPumpkinCreature(x, y, s) {
+        rect(x - 3*s, y - 7*s, 6*s, 3*s, "#648b4f");
+        rect(x - 6*s, y - 5*s, 12*s, 9*s, "#ef8b3b");
+        rect(x - 7*s, y - 2*s, 2*s, 5*s, "#d36b31");
+        rect(x + 5*s, y - 2*s, 2*s, 5*s, "#d36b31");
+        rect(x - 4*s, y - 4*s, 2*s, 7*s, "#ffb35b");
+        rect(x + 2*s, y - 4*s, 2*s, 7*s, "#c96832");
 
-        // Mejillas.
-        ctx.fillStyle = "#f8a9cb";
-        ctx.fillRect(-3.3 * u, -0.4 * u, 1.1 * u, 0.7 * u);
-        ctx.fillRect(2.2 * u, -0.4 * u, 1.1 * u, 0.7 * u);
+        rect(x - 4*s, y - 1*s, 2*s, 2*s, "#35233b");
+        rect(x + 2*s, y - 1*s, 2*s, 2*s, "#35233b");
+        rect(x - 2*s, y + 2*s, 4*s, 2*s, "#35233b");
+        rect(x - 3*s, y + 5*s, 2*s, 2*s, "#f6a04c");
+        rect(x + 2*s, y + 5*s, 2*s, 2*s, "#f6a04c");
+    }
 
-        // Ojos.
-        ctx.fillStyle = "#342647";
-        if (!this.blinking) {
-            ctx.fillRect(-2.7 * u, -2.2 * u, 1.3 * u, 1.8 * u);
-            ctx.fillRect(1.5 * u, -2.2 * u, 1.3 * u, 1.8 * u);
+    drawBat(x, y, s) {
+        rect(x - 3*s, y - 3*s, 6*s, 7*s, this.color);
+        rect(x - 7*s, y - 5*s, 5*s, 3*s, this.color);
+        rect(x - 9*s, y - 7*s, 5*s, 4*s, this.color);
+        rect(x + 2*s, y - 5*s, 5*s, 3*s, this.color);
+        rect(x + 4*s, y - 7*s, 5*s, 4*s, this.color);
 
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(-2.3 * u, -1.9 * u, 0.4 * u, 0.4 * u);
-            ctx.fillRect(1.9 * u, -1.9 * u, 0.4 * u, 0.4 * u);
-        } else {
-            ctx.fillRect(-2.7 * u, -1.6 * u, 1.3 * u, 0.3 * u);
-            ctx.fillRect(1.5 * u, -1.6 * u, 1.3 * u, 0.3 * u);
+        rect(x - 3*s, y + 3*s, 2*s, 3*s, "#b5a0ff");
+        rect(x + 2*s, y + 3*s, 2*s, 3*s, "#b5a0ff");
+        rect(x - 2*s, y - 1*s, 2*s, 2*s, "#fff0b8");
+        rect(x + 1*s, y - 1*s, 2*s, 2*s, "#fff0b8");
+        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#ff83c5");
+    }
+
+    drawZombie(x, y, s) {
+        rect(x - 5*s, y - 6*s, 10*s, 9*s, this.color);
+        rect(x - 4*s, y - 8*s, 8*s, 3*s, "#70594b");
+        rect(x - 6*s, y - 4*s, 2*s, 5*s, "#79b45d");
+        rect(x + 4*s, y - 3*s, 2*s, 4*s, "#79b45d");
+
+        rect(x - 3*s, y - 2*s, 2*s, 2*s, "#34253b");
+        rect(x + 2*s, y - 2*s, 2*s, 2*s, "#34253b");
+        rect(x - 2*s, y + 2*s, 5*s, 2*s, "#f3f0d9");
+        rect(x - 5*s, y + 4*s, 3*s, 3*s, "#8bbd69");
+        rect(x + 2*s, y + 4*s, 3*s, 3*s, "#8bbd69");
+    }
+
+    drawCat(x, y, s) {
+        rect(x - 6*s, y - 5*s, 3*s, 3*s, this.color);
+        rect(x - 5*s, y - 7*s, 3*s, 3*s, this.color);
+        rect(x + 3*s, y - 5*s, 3*s, 3*s, this.color);
+        rect(x + 2*s, y - 7*s, 3*s, 3*s, this.color);
+        rect(x - 6*s, y - 3*s, 12*s, 8*s, this.color);
+        rect(x - 5*s, y + 4*s, 3*s, 3*s, this.color);
+        rect(x + 2*s, y + 4*s, 3*s, 3*s, this.color);
+
+        rect(x - 3*s, y - 1*s, 2*s, 2*s, "#29243b");
+        rect(x + 2*s, y - 1*s, 2*s, 2*s, "#29243b");
+        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#ff9ecb");
+        rect(x - 7*s, y + 1*s, 2*s, 1*s, "#ff9ecb");
+        rect(x + 5*s, y + 1*s, 2*s, 1*s, "#ff9ecb");
+    }
+
+    drawSquashed() {
+        const p = Math.max(0, this.squashTimer / 0.28);
+        const width = this.size * 1.8 * (1.2 - p * 0.2);
+        const height = Math.max(1, this.size * 0.25 * p);
+
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+
+        rect(this.x - width - 2, this.y + 1, width * 2 + 4, 3, "#ff3366");
+        rect(this.x - width, this.y + 2, width * 2, 2, "#ffffff");
+
+        rect(
+            this.x - width,
+            this.y - height,
+            width * 2,
+            Math.max(2, height * 2),
+            this.color
+        );
+
+        rect(this.x - 5, this.y - 1, 2, 2, "#000000");
+        rect(this.x + 3, this.y - 1, 2, 2, "#000000");
+
+        ctx.restore();
+    }
+
+    containsPoint(x, y) {
+        return (
+            Math.abs(x - this.x) < this.size + 3 &&
+            Math.abs(y - this.y) < this.size + 3 &&
+            this.squash === 0
+        );
+    }
+
+    squashCreature() {
+        this.squash = 1;
+        this.squashTimer = 0.28;
+        createSplatter(this.x, this.y, this.color);
+    }
+
+    bounceFrom(other) {
+        if (this.squash || other.squash) return;
+
+        const dx = other.x - this.x;
+        const dy = other.y - this.y;
+        const distance = Math.hypot(dx, dy);
+        const minDistance = this.radius + other.radius;
+
+        if (distance === 0 || distance >= minDistance) return;
+
+        const nx = dx / distance;
+        const ny = dy / distance;
+
+        const overlap = minDistance - distance;
+        this.x -= nx * overlap / 2;
+        this.y -= ny * overlap / 2;
+        other.x += nx * overlap / 2;
+        other.y += ny * overlap / 2;
+
+        const relativeNormal =
+            (this.dx - other.dx) * nx +
+            (this.dy - other.dy) * ny;
+
+        if (relativeNormal > 0) {
+            this.dx -= relativeNormal * nx;
+            this.dy -= relativeNormal * ny;
+            other.dx += relativeNormal * nx;
+            other.dy += relativeNormal * ny;
         }
 
-        // Boca.
-        ctx.fillStyle = "#55364e";
-        ctx.fillRect(-0.8 * u, 0.1 * u, 1.6 * u, 1.1 * u);
-
-        // Moñito.
-        ctx.fillStyle = "#ec91c9";
-        ctx.fillRect(-1 * u, -4.9 * u, 1 * u, 1 * u);
-        ctx.fillRect(0, -4.9 * u, 1 * u, 1 * u);
-        ctx.fillRect(-0.2 * u, -4.6 * u, 0.5 * u, 0.5 * u);
-
-        // Brillo de la cabeza.
-        ctx.fillStyle = "#ffffff";
-        ctx.globalAlpha = 0.5;
-        ctx.fillRect(-2.8 * u, -3.5 * u, 1.1 * u, 0.4 * u);
-        ctx.globalAlpha = 1;
-    }
-
-    // -------------------------------------------------
-    // CALABAZA
-    // -------------------------------------------------
-
-    drawPumpkin() {
-        const u = this.size / 12;
-
-        // Tallo.
-        ctx.fillStyle = "#567f49";
-        ctx.fillRect(-0.9 * u, -5.5 * u, 1.8 * u, 2 * u);
-        ctx.fillRect(-0.2 * u, -6 * u, 1.1 * u, 1 * u);
-
-        // Cuerpo y segmentos.
-        ctx.fillStyle = "#bd622f";
-        ctx.fillRect(-4.6 * u, -3.8 * u, 9.2 * u, 7.2 * u);
-
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-3.8 * u, -4.3 * u, 7.6 * u, 7.1 * u);
-        ctx.fillRect(-4.7 * u, -2.5 * u, 1.2 * u, 4.3 * u);
-        ctx.fillRect(3.5 * u, -2.5 * u, 1.2 * u, 4.3 * u);
-
-        ctx.fillStyle = "#ffc86c";
-        ctx.fillRect(-2.6 * u, -3.7 * u, 1 * u, 5.8 * u);
-        ctx.fillRect(1.6 * u, -3.7 * u, 1 * u, 5.8 * u);
-
-        // Ojos triangulares.
-        ctx.fillStyle = "#ffef9a";
-        ctx.beginPath();
-        ctx.moveTo(-3 * u, -2 * u);
-        ctx.lineTo(-1 * u, -1 * u);
-        ctx.lineTo(-3 * u, 0);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.moveTo(3 * u, -2 * u);
-        ctx.lineTo(1 * u, -1 * u);
-        ctx.lineTo(3 * u, 0);
-        ctx.closePath();
-        ctx.fill();
-
-        // Boca sonriente.
-        ctx.fillStyle = "#4a2631";
-        ctx.fillRect(-2.7 * u, 0.8 * u, 5.4 * u, 1.3 * u);
-        ctx.fillRect(-1.9 * u, 0.2 * u, 1 * u, 0.7 * u);
-        ctx.fillRect(0.9 * u, 0.2 * u, 1 * u, 0.7 * u);
-
-        ctx.fillStyle = "#fff0b5";
-        ctx.fillRect(-1.2 * u, 0.8 * u, 0.8 * u, 0.5 * u);
-        ctx.fillRect(0.5 * u, 0.8 * u, 0.8 * u, 0.5 * u);
-    }
-
-    // -------------------------------------------------
-    // MURCIÉLAGO
-    // -------------------------------------------------
-
-    drawBat() {
-        const u = this.size / 12;
-
-        // Alas.
-        ctx.fillStyle = "#332b4e";
-
-        ctx.beginPath();
-        ctx.moveTo(-1 * u, -1 * u);
-        ctx.lineTo(-6 * u, -4 * u);
-        ctx.lineTo(-5 * u, -1 * u);
-        ctx.lineTo(-6 * u, 2 * u);
-        ctx.lineTo(-2 * u, 1.5 * u);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.moveTo(1 * u, -1 * u);
-        ctx.lineTo(6 * u, -4 * u);
-        ctx.lineTo(5 * u, -1 * u);
-        ctx.lineTo(6 * u, 2 * u);
-        ctx.lineTo(2 * u, 1.5 * u);
-        ctx.closePath();
-        ctx.fill();
-
-        // Interior de las alas.
-        ctx.fillStyle = "#8e6ca9";
-        ctx.fillRect(-4.7 * u, -1.8 * u, 1.2 * u, 2.3 * u);
-        ctx.fillRect(3.5 * u, -1.8 * u, 1.2 * u, 2.3 * u);
-
-        // Orejas.
-        ctx.fillStyle = "#403255";
-        ctx.fillRect(-3.5 * u, -5.5 * u, 1.5 * u, 3 * u);
-        ctx.fillRect(2 * u, -5.5 * u, 1.5 * u, 3 * u);
-
-        ctx.fillStyle = "#b98cc9";
-        ctx.fillRect(-3 * u, -4.8 * u, 0.5 * u, 1.4 * u);
-        ctx.fillRect(2.5 * u, -4.8 * u, 0.5 * u, 1.4 * u);
-
-        // Cabeza.
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-3.8 * u, -3.7 * u, 7.6 * u, 5.7 * u);
-
-        // Mejillas.
-        ctx.fillStyle = "#e89cce";
-        ctx.fillRect(-3 * u, 0.2 * u, 1.2 * u, 0.7 * u);
-        ctx.fillRect(1.8 * u, 0.2 * u, 1.2 * u, 0.7 * u);
-
-        // Ojos.
-        ctx.fillStyle = "#f7f0ff";
-        ctx.fillRect(-2.5 * u, -2.2 * u, 1.5 * u, 1.5 * u);
-        ctx.fillRect(1 * u, -2.2 * u, 1.5 * u, 1.5 * u);
-
-        ctx.fillStyle = "#d35c9c";
-        ctx.fillRect(-2 * u, -1.8 * u, 0.8 * u, 0.9 * u);
-        ctx.fillRect(1.3 * u, -1.8 * u, 0.8 * u, 0.9 * u);
-
-        // Colmillitos.
-        ctx.fillStyle = "#fff1ed";
-        ctx.fillRect(-1.8 * u, 1 * u, 0.7 * u, 1.2 * u);
-        ctx.fillRect(1.1 * u, 1 * u, 0.7 * u, 1.2 * u);
-    }
-
-    // -------------------------------------------------
-    // ZOMBI DETALLADO
-    // -------------------------------------------------
-
-    drawZombie() {
-        const u = this.size / 12;
-
-        // Zapatos.
-        ctx.fillStyle = "#20222b";
-        ctx.fillRect(-3.8 * u, 4.6 * u, 3.1 * u, 1.1 * u);
-        ctx.fillRect(0.7 * u, 4.6 * u, 3.1 * u, 1.1 * u);
-
-        // Piernas.
-        ctx.fillStyle = "#353e3c";
-        ctx.fillRect(-3 * u, 2.1 * u, 2 * u, 3 * u);
-        ctx.fillRect(1 * u, 2.1 * u, 2 * u, 3 * u);
-
-        // Pantalón rasgado.
-        ctx.fillStyle = "#566b53";
-        ctx.fillRect(-3 * u, 2.8 * u, 2 * u, 1.2 * u);
-        ctx.fillRect(1 * u, 2.8 * u, 2 * u, 1.2 * u);
-
-        ctx.fillStyle = "#293b33";
-        ctx.fillRect(-2.6 * u, 3.7 * u, 1.1 * u, 0.5 * u);
-        ctx.fillRect(1.6 * u, 3.5 * u, 0.9 * u, 0.8 * u);
-
-        // Brazos largos.
-        ctx.fillStyle = "#739767";
-        ctx.fillRect(-4.7 * u, -1 * u, 1.5 * u, 3.6 * u);
-        ctx.fillRect(3.2 * u, -1 * u, 1.5 * u, 3.6 * u);
-
-        // Manos.
-        ctx.fillStyle = "#a0bd81";
-        ctx.fillRect(-5 * u, 1.9 * u, 1.8 * u, 1.2 * u);
-        ctx.fillRect(3.3 * u, 1.9 * u, 1.8 * u, 1.2 * u);
-
-        // Dedos cuadrados.
-        ctx.fillRect(-5.1 * u, 2.7 * u, 0.5 * u, 1 * u);
-        ctx.fillRect(-4.1 * u, 2.7 * u, 0.5 * u, 1 * u);
-        ctx.fillRect(3.6 * u, 2.7 * u, 0.5 * u, 1 * u);
-        ctx.fillRect(4.6 * u, 2.7 * u, 0.5 * u, 1 * u);
-
-        // Camiseta vieja.
-        ctx.fillStyle = "#5a4764";
-        ctx.fillRect(-3.5 * u, -1.6 * u, 7 * u, 4.4 * u);
-
-        // Parches de la ropa.
-        ctx.fillStyle = "#352d43";
-        ctx.fillRect(-3.3 * u, 0.6 * u, 2.1 * u, 1.8 * u);
-        ctx.fillRect(1.5 * u, -0.7 * u, 1.5 * u, 2.4 * u);
-
-        ctx.fillStyle = "#b6a3bd";
-        ctx.fillRect(-2.7 * u, 1 * u, 1.1 * u, 0.4 * u);
-        ctx.fillRect(-2.2 * u, 1.4 * u, 0.4 * u, 0.8 * u);
-
-        // Cuello.
-        ctx.fillStyle = "#759a68";
-        ctx.fillRect(-1.3 * u, -2.7 * u, 2.6 * u, 1.4 * u);
-
-        // Orejas.
-        ctx.fillStyle = "#6e9366";
-        ctx.fillRect(-4 * u, -5.2 * u, 1.2 * u, 2.1 * u);
-        ctx.fillRect(2.8 * u, -5.2 * u, 1.2 * u, 2.1 * u);
-
-        // Cabeza y sombras.
-        ctx.fillStyle = "#456346";
-        ctx.fillRect(-3.8 * u, -7 * u, 7.6 * u, 7 * u);
-
-        ctx.fillStyle = "#83a975";
-        ctx.fillRect(-3.1 * u, -6.5 * u, 5.9 * u, 5.5 * u);
-
-        ctx.fillStyle = "#648b5d";
-        ctx.fillRect(-3.5 * u, -2.1 * u, 2 * u, 1 * u);
-        ctx.fillRect(1.6 * u, -6 * u, 1.1 * u, 2.2 * u);
-
-        // Pelo despeinado.
-        ctx.fillStyle = "#202a27";
-        ctx.fillRect(-4 * u, -7.5 * u, 2 * u, 1.4 * u);
-        ctx.fillRect(-2.7 * u, -8.4 * u, 2.1 * u, 1.7 * u);
-        ctx.fillRect(-0.8 * u, -7.8 * u, 2 * u, 1.2 * u);
-        ctx.fillRect(1.1 * u, -8.3 * u, 2.4 * u, 1.5 * u);
-        ctx.fillRect(3 * u, -7.3 * u, 1.1 * u, 1.3 * u);
-
-        ctx.fillStyle = "#46534a";
-        ctx.fillRect(-2.3 * u, -7.9 * u, 1.1 * u, 0.5 * u);
-        ctx.fillRect(1.8 * u, -7.7 * u, 1 * u, 0.5 * u);
-
-        // Cuencas.
-        ctx.fillStyle = "#354634";
-        ctx.fillRect(-2.8 * u, -5.4 * u, 2.3 * u, 2.1 * u);
-        ctx.fillRect(0.7 * u, -5.4 * u, 2.3 * u, 2.1 * u);
-
-        // Ojos amarillos y rojos.
-        ctx.fillStyle = "#f9efb4";
-        if (!this.blinking) {
-            ctx.fillRect(-2.4 * u, -5 * u, 1.5 * u, 1.4 * u);
-            ctx.fillRect(1.1 * u, -5 * u, 1.5 * u, 1.4 * u);
-
-            ctx.fillStyle = "#d74752";
-            ctx.fillRect(-1.9 * u, -4.7 * u, 0.8 * u, 0.9 * u);
-            ctx.fillRect(1.5 * u, -4.7 * u, 0.8 * u, 0.9 * u);
-
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(-2.1 * u, -4.9 * u, 0.4 * u, 0.4 * u);
-            ctx.fillRect(1.4 * u, -4.9 * u, 0.4 * u, 0.4 * u);
-        } else {
-            ctx.fillStyle = "#263329";
-            ctx.fillRect(-2.5 * u, -4.3 * u, 1.7 * u, 0.3 * u);
-            ctx.fillRect(1.1 * u, -4.3 * u, 1.7 * u, 0.3 * u);
-        }
-
-        // Cejas.
-        ctx.fillStyle = "#2a3529";
-        ctx.fillRect(-2.9 * u, -5.9 * u, 2.4 * u, 0.5 * u);
-        ctx.fillRect(0.7 * u, -5.6 * u, 2.4 * u, 0.5 * u);
-
-        // Nariz.
-        ctx.fillStyle = "#52764e";
-        ctx.fillRect(-0.6 * u, -3.8 * u, 1.2 * u, 1.1 * u);
-
-        // Boca abierta.
-        ctx.fillStyle = "#241820";
-        ctx.fillRect(-2.1 * u, -2.7 * u, 4.2 * u, 1.7 * u);
-
-        // Dientes.
-        ctx.fillStyle = "#eee6cf";
-        ctx.fillRect(-1.6 * u, -2.7 * u, 1 * u, 0.6 * u);
-        ctx.fillRect(0.4 * u, -2.7 * u, 1 * u, 0.6 * u);
-        ctx.fillRect(-0.6 * u, -1.5 * u, 1 * u, 0.5 * u);
-
-        // Cicatriz.
-        ctx.fillStyle = "#a74750";
-        ctx.fillRect(1.8 * u, -6.4 * u, 0.5 * u, 1.1 * u);
-        ctx.fillRect(1.2 * u, -5.8 * u, 1.5 * u, 0.4 * u);
-
-        // Herida de la mejilla.
-        ctx.fillStyle = "#b94f5c";
-        ctx.fillRect(-3.1 * u, -2.4 * u, 0.7 * u, 0.9 * u);
-
-        // Botones de la camiseta.
-        ctx.fillStyle = "#d6c28a";
-        ctx.fillRect(-0.3 * u, -0.4 * u, 0.6 * u, 0.6 * u);
-        ctx.fillRect(-0.3 * u, 0.9 * u, 0.6 * u, 0.6 * u);
-
-        // Contorno pixelado.
-        ctx.strokeStyle = "#253327";
-        ctx.lineWidth = Math.max(1, u * 0.4);
-        ctx.strokeRect(-3.8 * u, -7 * u, 7.6 * u, 7 * u);
-    }
-
-    // -------------------------------------------------
-    // GATITO FANTASMAL
-    // -------------------------------------------------
-
-    drawCat() {
-        const u = this.size / 12;
-
-        // Orejas.
-        ctx.fillStyle = "#7b5b86";
-        ctx.fillRect(-4 * u, -5.6 * u, 2.4 * u, 3.5 * u);
-        ctx.fillRect(1.6 * u, -5.6 * u, 2.4 * u, 3.5 * u);
-
-        ctx.fillStyle = "#f0a3c8";
-        ctx.fillRect(-3.3 * u, -4.9 * u, 1.1 * u, 1.9 * u);
-        ctx.fillRect(2.2 * u, -4.9 * u, 1.1 * u, 1.9 * u);
-
-        // Cuerpo.
-        ctx.fillStyle = "#8d6b99";
-        ctx.fillRect(-3.7 * u, -2.5 * u, 7.4 * u, 5.5 * u);
-
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-4 * u, -3 * u, 8 * u, 5.3 * u);
-
-        // Patitas.
-        ctx.fillStyle = "#b98bbd";
-        ctx.fillRect(-3.5 * u, 1.8 * u, 2 * u, 1.8 * u);
-        ctx.fillRect(1.5 * u, 1.8 * u, 2 * u, 1.8 * u);
-
-        // Cola.
-        ctx.fillStyle = "#b88bc2";
-        ctx.fillRect(3.1 * u, 1.4 * u, 1.5 * u, 1 * u);
-        ctx.fillRect(4.1 * u, 0.1 * u, 1.1 * u, 1.7 * u);
-        ctx.fillRect(3.5 * u, -0.4 * u, 1.5 * u, 0.9 * u);
-
-        // Mejillas.
-        ctx.fillStyle = "#f7a8cf";
-        ctx.fillRect(-3 * u, -0.1 * u, 1.2 * u, 0.8 * u);
-        ctx.fillRect(1.8 * u, -0.1 * u, 1.2 * u, 0.8 * u);
-
-        // Ojos.
-        if (!this.blinking) {
-            ctx.fillStyle = "#eaffb2";
-            ctx.fillRect(-2.5 * u, -2.1 * u, 1.6 * u, 1.7 * u);
-            ctx.fillRect(0.9 * u, -2.1 * u, 1.6 * u, 1.7 * u);
-
-            ctx.fillStyle = "#55364e";
-            ctx.fillRect(-1.9 * u, -2.1 * u, 0.5 * u, 1.7 * u);
-            ctx.fillRect(1.5 * u, -2.1 * u, 0.5 * u, 1.7 * u);
-
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(-2.2 * u, -2 * u, 0.4 * u, 0.4 * u);
-            ctx.fillRect(1.2 * u, -2 * u, 0.4 * u, 0.4 * u);
-        } else {
-            ctx.fillStyle = "#55364e";
-            ctx.fillRect(-2.5 * u, -1.4 * u, 1.6 * u, 0.3 * u);
-            ctx.fillRect(0.9 * u, -1.4 * u, 1.6 * u, 0.3 * u);
-        }
-
-        // Nariz.
-        ctx.fillStyle = "#f5a4c8";
-        ctx.fillRect(-0.4 * u, -0.4 * u, 0.8 * u, 0.6 * u);
-
-        // Boca.
-        ctx.fillStyle = "#68435e";
-        ctx.fillRect(-0.8 * u, 0.3 * u, 0.5 * u, 0.5 * u);
-        ctx.fillRect(0.3 * u, 0.3 * u, 0.5 * u, 0.5 * u);
-        ctx.fillRect(-0.2 * u, 0.7 * u, 0.5 * u, 0.5 * u);
-
-        // Bigotes.
-        ctx.fillStyle = "#f7e9ff";
-        ctx.fillRect(-4.1 * u, -0.2 * u, 1.5 * u, 0.2 * u);
-        ctx.fillRect(-4.1 * u, 0.6 * u, 1.5 * u, 0.2 * u);
-        ctx.fillRect(2.6 * u, -0.2 * u, 1.5 * u, 0.2 * u);
-        ctx.fillRect(2.6 * u, 0.6 * u, 1.5 * u, 0.2 * u);
-
-        // Collar y campanita.
-        ctx.fillStyle = "#f5c56d";
-        ctx.fillRect(-2.6 * u, 1.1 * u, 5.2 * u, 0.5 * u);
-        ctx.fillStyle = "#ffe8a4";
-        ctx.fillRect(-0.3 * u, 1.5 * u, 0.6 * u, 0.6 * u);
+        if (this.movement === "circular") this.angle += Math.PI;
+        if (other.movement === "circular") other.angle += Math.PI;
+
+        this.flash = 0.18;
+        other.flash = 0.18;
     }
 }
 
-// =====================================================
-// CREACIÓN Y REPOSICIÓN DE CRIATURAS
-// =====================================================
+// --------------------------------------------------
+// SCREAMER Y AUDIO
+// --------------------------------------------------
 
-function createCreature() {
-    const type = CREATURE_TYPES[randomInt(0, CREATURE_TYPES.length - 1)];
-    const palette = PALETTES[type];
-    const size = randomInt(16, 24);
-
-    const x = random(size + 10, WIDTH - size - 10);
-    const y = random(170, HEIGHT - size - 35);
-
-    let speedX = random(-1.25, 1.25);
-    let speedY = random(-0.95, 0.95);
-
-    if (Math.abs(speedX) < 0.35) {
-        speedX = speedX < 0 ? -0.45 : 0.45;
-    }
-
-    if (Math.abs(speedY) < 0.25) {
-        speedY = speedY < 0 ? -0.35 : 0.35;
-    }
-
-    return new Creature(
-        x,
-        y,
-        type,
-        size,
-        palette[randomInt(0, palette.length - 1)],
-        speedX,
-        speedY
-    );
+function scheduleNextScreamer() {
+    nextScreamerTime = rand(15, 30);
 }
 
-function maintainCreatures() {
-    creatures = creatures.filter(creature => !creature.dead);
-
-    while (
-        creatures.filter(
-            creature => !creature.squashing && !creature.dead
-        ).length < TARGET_CREATURES
-    ) {
-        creatures.push(createCreature());
-    }
-
-    updateScore();
+function triggerScreamer() {
+    screamerActive = true;
+    screamerTimer = 0.8;
+    
+    // Reproducir el archivo de audio del screamer
+    screamerSFX.currentTime = 0;
+    screamerSFX.play().catch(() => {});
 }
 
-function resetCreatures() {
+function updateScreamer(dt) {
+    if (!running) return;
+
+    if (!screamerActive) {
+        nextScreamerTime -= dt;
+        if (nextScreamerTime <= 0) {
+            triggerScreamer();
+            scheduleNextScreamer();
+        }
+    } else {
+        screamerTimer -= dt;
+        screamerFlash = !screamerFlash;
+        if (screamerTimer <= 0) {
+            screamerActive = false;
+        }
+    }
+}
+
+function drawScreamer() {
+    if (!screamerActive) return;
+
+    rect(0, 0, W, H, screamerFlash ? "#ff0033" : "#000000");
+
+    const cx = W / 2;
+    const cy = H / 2;
+
+    rect(cx - 50, cy - 60, 100, 110, "#ffffff");
+    rect(cx - 40, cy - 70, 80, 130, "#ffffff");
+
+    rect(cx - 35, cy - 35, 25, 30, "#000000");
+    rect(cx + 10, cy - 35, 25, 30, "#000000");
+    rect(cx - 28, cy - 25, 12, 12, "#ff0000");
+    rect(cx + 17, cy - 25, 12, 12, "#ff0000");
+
+    rect(cx - 30, cy + 10, 60, 40, "#000000");
+    rect(cx - 25, cy + 10, 8, 15, "#ffffff");
+    rect(cx - 10, cy + 10, 8, 20, "#ffffff");
+    rect(cx + 2, cy + 10, 8, 20, "#ffffff");
+    rect(cx + 17, cy + 10, 8, 15, "#ffffff");
+
+    rect(cx - 20, cy + 30, 8, 15, "#ffffff");
+    rect(cx + 12, cy + 30, 8, 15, "#ffffff");
+
+    rect(cx - 45, cy - 50, 6, 20, "#880000");
+    rect(cx + 38, cy - 40, 6, 30, "#880000");
+    rect(cx - 15, cy + 45, 30, 10, "#880000");
+}
+
+// --------------------------------------------------
+// BUCLE Y CONTROLADORES
+// --------------------------------------------------
+
+function createCreatures() {
     creatures = [];
     particles = [];
-
-    for (let i = 0; i < TARGET_CREATURES; i++) {
-        creatures.push(createCreature());
+    for (let i = 0; i < TOTAL; i++) {
+        creatures.push(new Creature());
     }
 
-    // Separar las criaturas al iniciar para reducir superposiciones.
-    for (let pass = 0; pass < 5; pass++) {
-        handleCollisions(true);
+    for (let i = 0; i < creatures.length; i++) {
+        for (let j = 0; j < i; j++) {
+            const a = creatures[i];
+            const b = creatures[j];
+            if (Math.hypot(a.x - b.x, a.y - b.y) < 16) {
+                a.x = rand(15, W - 15);
+                a.y = rand(20, H - 15);
+            }
+        }
     }
 
-    updateScore();
+    updateCounters();
 }
 
-// =====================================================
-// COLISIONES Y REBOTES
-// =====================================================
+function updateCounters() {
+    scoreElement.textContent = String(score).padStart(2, "0");
+    remainingElement.textContent = creatures.length;
+}
 
-function handleCollisions(separatingOnly = false) {
+function startGame() {
+    if (running) return;
+
+    running = true;
+    startMessage.style.display = "none";
+    lastTime = 0;
+    scheduleNextScreamer();
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+function restartGame() {
+    running = false;
+
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
+    score = 0;
+    screamerActive = false;
+    mouse = { x: -100, y: -100, inside: false };
+    createCreatures();
+    drawScene();
+
+    startMessage.style.display = "flex";
+    startButton.textContent = "COMENZAR JUEGO";
+}
+
+function gameLoop(timestamp) {
+    if (!running) return;
+
+    const dt = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.04) : 0;
+    lastTime = timestamp;
+
+    update(dt);
+    drawScene();
+
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+    creatures.forEach(creature => creature.update(dt));
+    updateParticles(dt);
+    updateScreamer(dt);
+
     for (let i = 0; i < creatures.length; i++) {
-        const a = creatures[i];
-
-        if (a.dead || a.squashing) continue;
-
         for (let j = i + 1; j < creatures.length; j++) {
-            const b = creatures[j];
-
-            if (b.dead || b.squashing) continue;
-
-            let dx = b.x - a.x;
-            let dy = b.y - a.y;
-            let distance = Math.hypot(dx, dy);
-
-            const minimumDistance = a.radius + b.radius;
-
-            if (distance >= minimumDistance) continue;
-
-            if (distance === 0) {
-                dx = 0.01;
-                dy = 0.01;
-                distance = Math.hypot(dx, dy);
-            }
-
-            const nx = dx / distance;
-            const ny = dy / distance;
-            const overlap = minimumDistance - distance;
-
-            // Separar las criaturas para que no queden pegadas.
-            a.x -= nx * overlap * 0.5;
-            a.y -= ny * overlap * 0.5;
-            b.x += nx * overlap * 0.5;
-            b.y += ny * overlap * 0.5;
-
-            if (separatingOnly) continue;
-
-            // Colisión elástica aproximada entre masas iguales.
-            const relativeX = a.speedX - b.speedX;
-            const relativeY = a.speedY - b.speedY;
-            const closingSpeed = relativeX * nx + relativeY * ny;
-
-            if (closingSpeed > 0) {
-                a.speedX -= closingSpeed * nx;
-                a.speedY -= closingSpeed * ny;
-
-                b.speedX += closingSpeed * nx;
-                b.speedY += closingSpeed * ny;
-            }
-
-            // Destello azul breve al tocarse.
-            a.hitFlash = 4;
-            b.hitFlash = 4;
+            creatures[i].bounceFrom(creatures[j]);
         }
     }
 }
 
-// =====================================================
-// INTERACCIÓN CON EL RATÓN
-// =====================================================
+function drawScene() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-function getCanvasPosition(event) {
-    const rect = canvas.getBoundingClientRect();
+    ctx.save();
+    ctx.scale(3, 3);
 
+    drawBackground();
+    creatures.forEach(creature => creature.draw());
+    drawParticles();
+
+    if (mouse.inside) drawCustomCursor(mouse.x, mouse.y);
+
+    drawScreamer();
+
+    ctx.restore();
+}
+
+function drawCustomCursor(x, y) {
+    ctx.save();
+    rect(x - 4, y - 1, 3, 2, "#ff0055");
+    rect(x + 2, y - 1, 3, 2, "#ff0055");
+    rect(x - 1, y - 4, 2, 3, "#ff0055");
+    rect(x - 1, y + 2, 2, 3, "#ff0055");
+    rect(x - 1, y - 1, 2, 2, "#ffffff");
+    ctx.restore();
+}
+
+function getMousePosition(event) {
+    const rectCanvas = canvas.getBoundingClientRect();
     return {
-        x: (event.clientX - rect.left) * (WIDTH / rect.width),
-        y: (event.clientY - rect.top) * (HEIGHT / rect.height)
+        x: (event.clientX - rectCanvas.left) / rectCanvas.width * W,
+        y: (event.clientY - rectCanvas.top) / rectCanvas.height * H
     };
 }
 
-canvas.addEventListener("click", event => {
-    if (!gameRunning || screamerActive) return;
+canvas.addEventListener("pointermove", event => {
+    const pos = getMousePosition(event);
+    mouse.x = pos.x;
+    mouse.y = pos.y;
+    mouse.inside = true;
+});
 
-    const position = getCanvasPosition(event);
+canvas.addEventListener("pointerleave", () => {
+    mouse.inside = false;
+});
 
-    // Comprobar primero las criaturas más cercanas al frente.
+canvas.addEventListener("pointerdown", event => {
+    if (!running || screamerActive) return;
+
+    const pos = getMousePosition(event);
+
     for (let i = creatures.length - 1; i >= 0; i--) {
         const creature = creatures[i];
 
-        if (creature.dead || creature.squashing) continue;
-
-        const distance = Math.hypot(
-            position.x - creature.x,
-            position.y - creature.y
-        );
-
-        if (distance <= creature.radius * 1.6) {
-            creature.squashing = true;
-            creature.squashTimer = 240;
-
+        if (creature.containsPoint(pos.x, pos.y)) {
+            creature.squashCreature();
             score++;
-            createParticles(
-                creature.x,
-                creature.y,
-                PALETTES[creature.type][0],
-                18
-            );
-
-            updateScore();
-            gameStatus.textContent = "¡Has capturado un alma! ✨";
-
+            updateCounters();
             break;
         }
     }
 });
 
-// =====================================================
-// SCREAMER
-// =====================================================
+// --------------------------------------------------
+// CONTROL DE MÚSICA DE FONDO
+// --------------------------------------------------
 
-function scheduleNextScreamer() {
-    // Próximo susto aleatorio entre 20 y 35 segundos.
-    nextScreamerTime = performance.now() + random(20000, 35000);
-}
-
-function triggerScreamer() {
-    if (!gameRunning || screamerActive) return;
-
-    const now = performance.now();
-
-    // Evitar que se active varias veces seguidas.
-    if (now - lastScreamerAt < 8000) {
-        scheduleNextScreamer();
-        return;
-    }
-
-    lastScreamerAt = now;
-    screamerActive = true;
-
-    screamerOverlay.classList.remove("active");
-    screamerOverlay.setAttribute("aria-hidden", "false");
-
-    // Reiniciar animación CSS.
-    void screamerOverlay.offsetWidth;
-    screamerOverlay.classList.add("active");
-
-    if (screamerAudio) {
-        screamerAudio.pause();
-        screamerAudio.currentTime = 0;
-        screamerAudio.volume = 1;
-
-        screamerAudio.play().catch(() => {
-            console.warn(
-                "El navegador no permitió reproducir el grito automáticamente."
-            );
-        });
-    }
-
-    gameStatus.textContent = "¡ALGO TE HA ENCONTRADO!";
-
-    clearTimeout(screamerTimeout);
-
-    screamerTimeout = setTimeout(() => {
-        screamerOverlay.classList.remove("active");
-        screamerOverlay.setAttribute("aria-hidden", "true");
-
-        if (screamerAudio) {
-            screamerAudio.pause();
-            screamerAudio.currentTime = 0;
-        }
-
-        screamerActive = false;
-
-        if (gameRunning) {
-            gameStatus.textContent = "No estás a salvo...";
-            scheduleNextScreamer();
-        }
-    }, 1100);
-}
-
-// =====================================================
-// MÚSICA AMBIENTAL
-// =====================================================
-
-async function toggleMusic() {
-    if (!backgroundMusic) return;
-
-    if (musicEnabled) {
-        backgroundMusic.pause();
-        musicEnabled = false;
-        musicButton.textContent = "♫ Activar música";
-        return;
-    }
-
-    try {
-        backgroundMusic.volume = 0.45;
-        await backgroundMusic.play();
-
-        musicEnabled = true;
-        musicButton.textContent = "♫ Silenciar música";
-    } catch (error) {
-        musicEnabled = false;
-        musicButton.textContent = "♫ Reintentar música";
-        console.warn(
-            "No se pudo reproducir la música. Revisa audio/terror.mp3.",
-            error
-        );
-    }
-}
-
-musicButton.addEventListener("click", toggleMusic);
-
-// =====================================================
-// INICIO, PAUSA Y REINICIO
-// =====================================================
-
-function startGame() {
-    if (gameRunning) return;
-
-    gameStarted = true;
-    gameRunning = true;
-
-    startMessage.classList.add("hidden");
-    startMessage.setAttribute("aria-hidden", "true");
-
-    startButton.textContent = "Entrar al cementerio";
-
-    gameStatus.textContent = "Las criaturas están despiertas...";
-    lastFrameTime = performance.now();
-
-    scheduleNextScreamer();
-
-    if (!musicEnabled) {
-        toggleMusic();
-    }
-
-    if (animationFrame !== null) {
-        cancelAnimationFrame(animationFrame);
-    }
-
-    animationFrame = requestAnimationFrame(gameLoop);
-}
-
-function restartGame() {
-    gameRunning = false;
-    gameStarted = false;
-
-    if (animationFrame !== null) {
-        cancelAnimationFrame(animationFrame);
-        animationFrame = null;
-    }
-
-    clearTimeout(screamerTimeout);
-
-    screamerActive = false;
-
-    screamerOverlay.classList.remove("active");
-    screamerOverlay.setAttribute("aria-hidden", "true");
-
-    if (screamerAudio) {
-        screamerAudio.pause();
-        screamerAudio.currentTime = 0;
-    }
-
-    if (backgroundMusic) {
-        backgroundMusic.pause();
-        backgroundMusic.currentTime = 0;
-    }
-
+function stopMusic() {
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
     musicEnabled = false;
-    musicButton.textContent = "♫ Activar música";
-
-    score = 0;
-    resetCreatures();
-
-    // Limpiar el canvas antes de volver a mostrar el menú.
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    drawBackground();
-    creatures.forEach(creature => creature.draw());
-
-    gameStatus.textContent = "Esperando la medianoche...";
-    startButton.textContent = "✦ Entrar al cementerio";
-
-    // Restablecer la pantalla centrada.
-    startMessage.classList.remove("hidden");
-    startMessage.style.display = "";
-    startMessage.setAttribute("aria-hidden", "false");
+    musicButton.textContent = "♫ ACTIVAR MÚSICA";
 }
 
-startButton.addEventListener("click", () => {
-    if (!gameRunning) {
-        startGame();
-    }
+function startMusic() {
+    bgMusic.play().then(() => {
+        musicEnabled = true;
+        musicButton.textContent = "♫ SILENCIAR MÚSICA";
+    }).catch(err => {
+        console.log("Error al reproducir audio:", err);
+    });
+}
+
+startButton.addEventListener("click", startGame);
+restartButton.addEventListener("click", restartGame);
+musicButton.addEventListener("click", () => {
+    if (musicEnabled) stopMusic();
+    else startMusic();
 });
 
-restartButton.addEventListener("click", restartGame);
-
-// =====================================================
-// BUCLE PRINCIPAL
-// =====================================================
-
-function gameLoop(timestamp) {
-    if (!gameRunning) return;
-
-    const delta = Math.min(timestamp - lastFrameTime || 16.67, 40);
-    lastFrameTime = timestamp;
-
-    drawBackground();
-
-    if (!screamerActive) {
-        for (const creature of creatures) {
-            creature.update(delta);
-        }
-
-        handleCollisions();
-
-        for (const creature of creatures) {
-            creature.draw();
-        }
-
-        for (const particle of particles) {
-            particle.update();
-            particle.draw();
-        }
-
-        particles = particles.filter(particle => particle.life > 0);
-
-        maintainCreatures();
-
-        if (timestamp >= nextScreamerTime) {
-            triggerScreamer();
-        }
-    }
-
-    animationFrame = requestAnimationFrame(gameLoop);
-}
-
-// =====================================================
-// INICIALIZACIÓN
-// =====================================================
-
-function initializeGame() {
-    resetCreatures();
-
-    drawBackground();
-
-    for (const creature of creatures) {
-        creature.draw();
-    }
-
-    startMessage.classList.remove("hidden");
-    startMessage.setAttribute("aria-hidden", "false");
-
-    gameStatus.textContent = "Esperando la medianoche...";
-}
-
-initializeGame();
+// Dibujo inicial
+createCreatures();
+drawScene();
