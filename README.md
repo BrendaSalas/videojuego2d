@@ -1,10 +1,10 @@
-# 🎃 Cemetery Catch: Spooky-Kawaii Edition
+# Cementerio Pixel
 
 Un videojuego interactivo web estilo *clicker / arcade* desarrollado con tecnología **HTML5 Canvas** y **JavaScript Vanilla**, ambientado en un cementerio místico procedural con estética pixel art.
 
 ---
 
-## 📜 Contexto
+## Contexto
 
 El desarrollo de videojuegos web con JavaScript puro utilizando la API de `HTML5 Canvas` permite explorar la renderización gráfica 2D eficiente en tiempo real sin la necesidad de motores externos pesados (como Unity o Phaser). 
 
@@ -12,7 +12,7 @@ El desarrollo de videojuegos web con JavaScript puro utilizando la API de `HTML5
 
 ---
 
-## 🎯 Objetivo
+## Objetivo
 
 * **Objetivo Principal:** Desarrollar un videojuego web 2D interactivo, responsivo y dinámico en el que el jugador deba "atrapar" (aplastar) criaturas místicas en un cementerio antes de que sigan proliferando, ofreciendo una experiencia inmersiva mediante respuestas dinámicas de sonido, efectos visuales de partículas y eventos aleatorios.
 * **Objetivos Específicos:**
@@ -23,7 +23,7 @@ El desarrollo de videojuegos web con JavaScript puro utilizando la API de `HTML5
 
 ---
 
-## 💡 Justificación
+## Justificación
 
 En el desarrollo web actual, es común depender de librerías y frameworks extensos. Este proyecto demuestra el potencial técnico y la eficiencia de utilizar código nativo para manejar:
 
@@ -34,7 +34,7 @@ En el desarrollo web actual, es común depender de librerías y frameworks exten
 
 ---
 
-## 🎮 Operación del Videojuego
+## Operación del Videojuego
 
 ### 1. Requisitos e Instalación
 No requiere servidores ni compiladores. Únicamente necesitas clonar o descargar el repositorio y abrir `index.html` en cualquier navegador web moderno (Chrome, Edge, Firefox, Safari).
