@@ -8,12 +8,16 @@ const startButton = document.getElementById("startButton");
 const restartButton = document.getElementById("restartButton");
 const musicButton = document.getElementById("musicButton");
 
+canvas.width = 960;
+canvas.height = 540;
+
 const W = 320;
 const H = 180;
 const TOTAL = 25;
 
 let creatures = [];
 let particles = [];
+let wandSparks = [];
 let score = 0;
 let running = false;
 let animationId = null;
@@ -21,30 +25,40 @@ let lastTime = 0;
 let mouse = { x: -100, y: -100, inside: false };
 
 // --------------------------------------------------
-// CARGA DE ARCHIVOS DE AUDIO EXTERNOS
+// CONFIGURACIÓN DE AUDIO
 // --------------------------------------------------
-const bgMusic = new Audio("assets/terror.mp3");
-bgMusic.loop = true;
-bgMusic.volume = 0.4; // Ajusta el volumen general de la música (0.0 a 1.0)
+function loadAudio(filename) {
+    const audio = new Audio(filename);
+    audio.onerror = () => {
+        audio.src = "assets/" + filename;
+    };
+    return audio;
+}
 
-const screamerSFX = new Audio("assets/screamer.mp3");
-screamerSFX.volume = 0.8; // Ajusta el volumen del susto
+const bgMusic = loadAudio("terror.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+
+const screamerSFX = loadAudio("screamer.mp3");
+screamerSFX.loop = false;
+screamerSFX.volume = 0.85;
 
 let musicEnabled = false;
 
-// Variables del Screamer Pixel Art
+// Variables Screamer
 let screamerActive = false;
 let screamerTimer = 0;
 let screamerFlash = false;
 let nextScreamerTime = 0;
 
+// PALETA DE COLORES REALISTA / SPOOKY-KAWAII INTEGRADA
 const colors = {
-    ghost: "#e9f4e9",
-    pinkGhost: "#ff9bd5",
-    mint: "#a6ffd1",
-    pumpkin: "#ff9b43",
-    purple: "#bb91ff",
-    zombie: "#a5dc78"
+    ghost: "#d0e3d4",       // Fantasma ectoplasma suave (blanco verdoso de tumba)
+    witch: "#4a325a",       // Bruja (púrpura noche profundo)
+    mint: "#71bda4",        // Murciélago (verde musgo / menta apagado)
+    pumpkin: "#d4753b",     // Calabaza (naranja terracota maduro)
+    cat: "#221d2b",         // Gato místico (negro noche con matiz violeta)
+    zombie: "#728d61"       // Zombie (verde olivo)
 };
 
 const rand = (min, max) => Math.random() * (max - min) + min;
@@ -56,7 +70,7 @@ function rect(x, y, w, h, color) {
 }
 
 // --------------------------------------------------
-// FONDO PIXEL ART: CEMENTERIO NOCTURNO
+// DIBUJO DEL CEMENTERIO
 // --------------------------------------------------
 
 function drawBackground() {
@@ -73,12 +87,15 @@ function drawBackground() {
     rect(239, 31, 5, 5, "#8798b2");
 
     // Estrellas
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < 45; i++) {
         const x = (i * 47 + 13) % W;
         const y = (i * 29 + 7) % 68;
-        rect(x, y, i % 4 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1,
-            i % 3 === 0 ? "#f7d9a1" : "#a7b9e9");
+        rect(x, y, i % 4 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1, i % 3 === 0 ? "#f7d9a1" : "#a7b9e9");
     }
+
+    // Murciélagos
+    rect(45, 18, 3, 1, "#252746"); rect(49, 18, 3, 1, "#252746"); rect(47, 19, 3, 1, "#252746");
+    rect(185, 12, 3, 1, "#252746"); rect(189, 12, 3, 1, "#252746"); rect(187, 13, 3, 1, "#252746");
 
     // Nubes
     rect(22, 24, 31, 5, "#252746");
@@ -88,7 +105,7 @@ function drawBackground() {
     rect(175, 27, 29, 4, "#252746");
     rect(184, 31, 31, 4, "#252746");
 
-    // Árboles lejanos / Montañas
+    // Montañas
     rect(0, 72, 320, 18, "#202a3c");
     for (let x = -5; x < W; x += 19) {
         rect(x + 6, 48 + (x % 3) * 3, 4, 36, "#111a29");
@@ -97,64 +114,106 @@ function drawBackground() {
         rect(x + 6, 44 + (x % 3), 5, 12, "#182438");
     }
 
-    // Terreno y camino
+    // Suelo uniforme sin sendero
     rect(0, 88, W, 92, "#29283b");
     rect(0, 91, W, 5, "#3a3948");
     rect(0, 96, W, 4, "#323246");
 
-    rect(133, 95, 44, 85, "#454252");
-    rect(141, 95, 29, 85, "#514b58");
-    for (let y = 98; y < H; y += 12) {
-        rect(136, y, 7, 1, "#29283b");
-        rect(159, y + 5, 10, 1, "#393547");
-    }
+    // Mausoleo
+    drawMausoleum(135, 68);
 
     // Lápidas
     drawGrave(18, 80, 17, 25, "#77748a", "#47465e");
     drawGrave(65, 85, 18, 27, "#77748a", "#4c4961");
     drawGrave(108, 81, 17, 24, "#66667d", "#44445c");
+    drawGrave(180, 86, 16, 25, "#66667d", "#44445c");
+    drawGrave(135, 115, 15, 22, "#58566b", "#3d3c4d");
     drawGrave(202, 83, 19, 27, "#77748a", "#49465e");
     drawGrave(277, 80, 19, 29, "#858095", "#514a65");
 
-    rect(24, 83, 3, 8, "#c5b9a4");
-    rect(21, 85, 9, 3, "#c5b9a4");
-    rect(285, 83, 3, 9, "#d0bfa9");
-    rect(282, 86, 9, 3, "#d0bfa9");
+    // Cruces
+    rect(24, 83, 3, 8, "#c5b9a4"); rect(21, 85, 9, 3, "#c5b9a4");
+    rect(285, 83, 3, 9, "#d0bfa9"); rect(282, 86, 9, 3, "#d0bfa9");
+    rect(184, 88, 2, 7, "#c5b9a4"); rect(182, 90, 6, 2, "#c5b9a4");
 
+    // Ataúd
+    drawCoffin(155, 145);
+
+    // Árboles
     drawDeadTree(5, 48, 1);
     drawDeadTree(302, 46, -1);
 
     // Vallas
-    for (let x = 0; x < 64; x += 9) {
+    for (let x = 0; x < 90; x += 9) {
         rect(x, 112, 3, 18, "#65506d");
         rect(x - 2, 116, 7, 3, "#87677b");
     }
-    rect(0, 114, 65, 3, "#87677b");
-    rect(0, 125, 65, 3, "#654a68");
+    rect(0, 114, 91, 3, "#87677b");
+    rect(0, 125, 91, 3, "#654a68");
 
-    for (let x = 248; x < 320; x += 9) {
+    for (let x = 220; x < 320; x += 9) {
         rect(x, 116, 3, 16, "#65506d");
         rect(x - 2, 119, 7, 3, "#87677b");
     }
-    rect(247, 117, 73, 3, "#87677b");
-    rect(247, 129, 73, 3, "#654a68");
+    rect(219, 117, 101, 3, "#87677b");
+    rect(219, 129, 101, 3, "#654a68");
 
+    // Calabazas
     drawPumpkin(77, 143, 0.8);
     drawPumpkin(257, 139, 0.7);
+    drawPumpkin(120, 130, 0.65);
 
-    // Plantas y niebla
-    for (let i = 0; i < 22; i++) {
-        const x = (i * 53 + 16) % W;
-        const y = 105 + (i * 17) % 69;
+    // Flores y calaveras
+    for (let i = 0; i < 28; i++) {
+        const x = (i * 43 + 12) % W;
+        const y = 105 + (i * 19) % 68;
         rect(x, y, 2, 5, "#527c54");
         rect(x - 2, y + 1, 2, 2, "#e49ab8");
         rect(x + 2, y + 2, 2, 2, "#b8a0ff");
     }
 
-    rect(0, 105, 42, 4, "#77768b");
-    rect(11, 109, 48, 3, "#53536e");
-    rect(244, 105, 35, 3, "#77768b");
-    rect(269, 108, 42, 4, "#53536e");
+    drawSkull(45, 158);
+    drawSkull(225, 162);
+    drawSkull(110, 165);
+
+    for (let i = 0; i < 85; i++) {
+        const x = (i * 37 + 9) % W;
+        const y = 97 + (i * 23) % 80;
+        rect(x, y, 2, 1, i % 2 ? "#494356" : "#505047");
+    }
+
+    // Niebla
+    rect(0, 105, 55, 4, "rgba(119, 118, 139, 0.5)");
+    rect(11, 109, 68, 3, "rgba(83, 83, 110, 0.5)");
+    rect(130, 155, 60, 4, "rgba(119, 118, 139, 0.4)");
+    rect(230, 105, 55, 3, "rgba(119, 118, 139, 0.5)");
+    rect(250, 108, 62, 4, "rgba(83, 83, 110, 0.5)");
+}
+
+function drawMausoleum(x, y) {
+    rect(x, y + 8, 32, 22, "#4d4a5e");
+    rect(x + 2, y + 10, 28, 18, "#393847");
+    rect(x - 3, y + 5, 38, 4, "#66647a");
+    rect(x + 2, y + 1, 28, 5, "#525063");
+    rect(x + 11, y + 14, 10, 14, "#1d1c26");
+    rect(x + 12, y + 16, 3, 12, "#393847");
+    rect(x + 17, y + 16, 3, 12, "#393847");
+    rect(x + 15, y - 3, 2, 5, "#a19da8");
+    rect(x + 13, y - 1, 6, 2, "#a19da8");
+}
+
+function drawCoffin(x, y) {
+    rect(x - 4, y + 2, 22, 8, "#1d1b26");
+    rect(x - 2, y + 4, 18, 5, "#3d2d24");
+    rect(x, y, 14, 6, "#5c4028");
+    rect(x + 2, y - 2, 10, 3, "#704f33");
+    rect(x + 5, y + 1, 4, 2, "#a18a4a");
+}
+
+function drawSkull(x, y) {
+    rect(x, y, 4, 3, "#d9d2c5");
+    rect(x + 1, y + 3, 2, 1, "#d9d2c5");
+    rect(x + 1, y + 1, 1, 1, "#29283b");
 }
 
 function drawGrave(x, y, w, h, front, shadow) {
@@ -195,17 +254,15 @@ function drawPumpkin(x, y, scale = 1) {
 }
 
 // --------------------------------------------------
-// SISTEMA DE PARTÍCULAS
+// PARTÍCULAS
 // --------------------------------------------------
+
 function createSplatter(x, y, color) {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
         particles.push({
-            x: x,
-            y: y,
-            vx: rand(-30, 30),
-            vy: rand(-20, 10),
-            color: color,
-            life: rand(0.2, 0.4)
+            x: x, y: y,
+            vx: rand(-30, 30), vy: rand(-20, 10),
+            color: color, life: rand(0.2, 0.4)
         });
     }
 }
@@ -218,10 +275,19 @@ function updateParticles(dt) {
         p.life -= dt;
         if (p.life <= 0) particles.splice(i, 1);
     }
+
+    for (let i = wandSparks.length - 1; i >= 0; i--) {
+        const s = wandSparks[i];
+        s.y += s.vy * dt;
+        s.x += s.vx * dt;
+        s.life -= dt;
+        if (s.life <= 0) wandSparks.splice(i, 1);
+    }
 }
 
 function drawParticles() {
     particles.forEach(p => rect(p.x, p.y, 2, 2, p.color));
+    wandSparks.forEach(s => rect(s.x, s.y, 1, 1, s.color));
 }
 
 // --------------------------------------------------
@@ -238,9 +304,9 @@ class Creature {
         this.y = rand(18, H - 12);
         this.size = rand(8, 12);
         this.speed = rand(18, 39);
-        this.type = choice(["ghost", "pumpkin", "bat", "zombie", "cat"]);
+        this.type = choice(["ghost", "pumpkin", "bat", "zombie", "cat", "witch"]);
         this.movement = choice(["up", "down", "diagonal", "circular"]);
-        this.color = choice(Object.values(colors));
+        this.color = colors[this.type] || choice(Object.values(colors));
         this.angle = rand(0, Math.PI * 2);
         this.phase = rand(0, Math.PI * 2);
         this.flash = 0;
@@ -302,24 +368,6 @@ class Creature {
             this.y += this.dy * velocity;
         }
 
-        if (this.fadeDirection === 0 && Math.random() < 0.0008) {
-            this.fadeDirection = 1;
-        }
-
-        if (this.fadeDirection !== 0) {
-            this.opacity -= this.fadeDirection * dt * 2.5;
-
-            if (this.opacity <= 0) {
-                this.opacity = 0;
-                this.respawn();
-                this.opacity = 0;
-                this.fadeDirection = -1;
-            } else if (this.opacity >= 1) {
-                this.opacity = 1;
-                this.fadeDirection = 0;
-            }
-        }
-
         const margin = this.size + 2;
 
         if (this.x < margin) {
@@ -375,6 +423,7 @@ class Creature {
             case "bat": this.drawBat(x, y, s); break;
             case "zombie": this.drawZombie(x, y, s); break;
             case "cat": this.drawCat(x, y, s); break;
+            case "witch": this.drawWitch(x, y, s); break;
         }
     }
 
@@ -436,19 +485,40 @@ class Creature {
     }
 
     drawCat(x, y, s) {
-        rect(x - 6*s, y - 5*s, 3*s, 3*s, this.color);
-        rect(x - 5*s, y - 7*s, 3*s, 3*s, this.color);
-        rect(x + 3*s, y - 5*s, 3*s, 3*s, this.color);
-        rect(x + 2*s, y - 7*s, 3*s, 3*s, this.color);
-        rect(x - 6*s, y - 3*s, 12*s, 8*s, this.color);
-        rect(x - 5*s, y + 4*s, 3*s, 3*s, this.color);
-        rect(x + 2*s, y + 4*s, 3*s, 3*s, this.color);
+        rect(x - 5*s, y - 6*s, 3*s, 3*s, this.color);
+        rect(x + 2*s, y - 6*s, 3*s, 3*s, this.color);
+        rect(x - 4*s, y - 5*s, 1*s, 2*s, "#e899b9");
+        rect(x + 3*s, y - 5*s, 1*s, 2*s, "#e899b9");
 
-        rect(x - 3*s, y - 1*s, 2*s, 2*s, "#29243b");
-        rect(x + 2*s, y - 1*s, 2*s, 2*s, "#29243b");
-        rect(x - 1*s, y + 2*s, 2*s, 1*s, "#ff9ecb");
-        rect(x - 7*s, y + 1*s, 2*s, 1*s, "#ff9ecb");
-        rect(x + 5*s, y + 1*s, 2*s, 1*s, "#ff9ecb");
+        rect(x - 5*s, y - 3*s, 10*s, 7*s, this.color);
+        rect(x - 4*s, y + 4*s, 3*s, 3*s, this.color);
+        rect(x + 1*s, y + 4*s, 3*s, 3*s, this.color);
+
+        rect(x - 3*s, y - 1*s, 2*s, 2*s, "#fce373");
+        rect(x + 1*s, y - 1*s, 2*s, 2*s, "#fce373");
+        rect(x - 2*s, y - 1*s, 1*s, 2*s, "#15101a");
+        rect(x + 2*s, y - 1*s, 1*s, 2*s, "#15101a");
+
+        rect(x - 1*s, y + 1*s, 2*s, 1*s, "#e899b9");
+        rect(x - 7*s, y, 2*s, 1*s, "#837993");
+        rect(x + 5*s, y, 2*s, 1*s, "#837993");
+    }
+
+    drawWitch(x, y, s) {
+        rect(x - 1*s, y - 9*s, 2*s, 2*s, "#1f1829");
+        rect(x - 2*s, y - 7*s, 4*s, 2*s, "#1f1829");
+        rect(x - 3*s, y - 5*s, 6*s, 2*s, "#8a4f7d");
+        rect(x - 6*s, y - 3*s, 12*s, 2*s, "#1f1829");
+
+        rect(x - 4*s, y - 1*s, 8*s, 4*s, "#d9c5b2");
+        rect(x - 5*s, y - 1*s, 2*s, 6*s, "#2a2233");
+        rect(x + 3*s, y - 1*s, 2*s, 6*s, "#2a2233");
+
+        rect(x - 3*s, y, 2*s, 2*s, "#71bda4");
+        rect(x + 1*s, y, 2*s, 2*s, "#71bda4");
+
+        rect(x - 4*s, y + 3*s, 8*s, 5*s, this.color);
+        rect(x - 5*s, y + 6*s, 10*s, 2*s, this.color);
     }
 
     drawSquashed() {
@@ -529,7 +599,7 @@ class Creature {
 }
 
 // --------------------------------------------------
-// SCREAMER Y AUDIO
+// SCREAMER
 // --------------------------------------------------
 
 function scheduleNextScreamer() {
@@ -540,9 +610,10 @@ function triggerScreamer() {
     screamerActive = true;
     screamerTimer = 0.8;
     
-    // Reproducir el archivo de audio del screamer
     screamerSFX.currentTime = 0;
-    screamerSFX.play().catch(() => {});
+    screamerSFX.play().catch(err => {
+        console.log("Error de interacción al reproducir el screamer:", err);
+    });
 }
 
 function updateScreamer(dt) {
@@ -594,7 +665,39 @@ function drawScreamer() {
 }
 
 // --------------------------------------------------
-// BUCLE Y CONTROLADORES
+// CURSOR: VARITA MÁGICA
+// --------------------------------------------------
+
+function drawCustomCursor(x, y) {
+    ctx.save();
+
+    rect(x - 2, y + 2, 2, 7, "#6e4a27");
+    rect(x - 1, y, 2, 3, "#9b6b3c");
+
+    rect(x - 2, y - 3, 3, 3, "#9d6bff");
+    rect(x - 1, y - 5, 2, 2, "#9dffb0");
+    rect(x, y - 6, 1, 1, "#ffffff");
+
+    rect(x - 5, y - 4, 2, 1, "#ff83c5");
+    rect(x + 3, y - 4, 2, 1, "#ff83c5");
+    rect(x - 1, y - 8, 1, 2, "#fff2ce");
+
+    if (Math.random() < 0.35) {
+        wandSparks.push({
+            x: x + rand(-4, 4),
+            y: y + rand(-4, 4),
+            vx: rand(-8, 8),
+            vy: rand(5, 15),
+            color: choice(["#9dffb0", "#ff83c5", "#fff2ce", "#9d6bff"]),
+            life: rand(0.15, 0.3)
+        });
+    }
+
+    ctx.restore();
+}
+
+// --------------------------------------------------
+// EVENTOS Y CONTROLADORES
 // --------------------------------------------------
 
 function createCreatures() {
@@ -692,16 +795,6 @@ function drawScene() {
     ctx.restore();
 }
 
-function drawCustomCursor(x, y) {
-    ctx.save();
-    rect(x - 4, y - 1, 3, 2, "#ff0055");
-    rect(x + 2, y - 1, 3, 2, "#ff0055");
-    rect(x - 1, y - 4, 2, 3, "#ff0055");
-    rect(x - 1, y + 2, 2, 3, "#ff0055");
-    rect(x - 1, y - 1, 2, 2, "#ffffff");
-    ctx.restore();
-}
-
 function getMousePosition(event) {
     const rectCanvas = canvas.getBoundingClientRect();
     return {
@@ -739,32 +832,39 @@ canvas.addEventListener("pointerdown", event => {
 });
 
 // --------------------------------------------------
-// CONTROL DE MÚSICA DE FONDO
+// CONTROL DE AUDIO
 // --------------------------------------------------
-
-function stopMusic() {
-    bgMusic.pause();
-    bgMusic.currentTime = 0;
-    musicEnabled = false;
-    musicButton.textContent = "♫ ACTIVAR MÚSICA";
-}
 
 function startMusic() {
     bgMusic.play().then(() => {
         musicEnabled = true;
         musicButton.textContent = "♫ SILENCIAR MÚSICA";
     }).catch(err => {
-        console.log("Error al reproducir audio:", err);
+        console.log("Audio pausado por el navegador:", err);
     });
 }
 
-startButton.addEventListener("click", startGame);
-restartButton.addEventListener("click", restartGame);
-musicButton.addEventListener("click", () => {
-    if (musicEnabled) stopMusic();
-    else startMusic();
+function stopMusic() {
+    bgMusic.pause();
+    musicEnabled = false;
+    musicButton.textContent = "♫ ACTIVAR MÚSICA";
+}
+
+startButton.addEventListener("click", () => {
+    startGame();
+    startMusic();
 });
 
-// Dibujo inicial
+restartButton.addEventListener("click", restartGame);
+
+musicButton.addEventListener("click", () => {
+    if (musicEnabled) {
+        stopMusic();
+    } else {
+        startMusic();
+    }
+});
+
+// Inicialización
 createCreatures();
 drawScene();
