@@ -1,12 +1,14 @@
+
 "use strict";
 
-// =============================================
-// CEMENTERIO PIXEL
-// =============================================
+// =====================================================
+// CEMENTERIO PIXEL - CONFIGURACIÓN GENERAL
+// =====================================================
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+const scoreElement = document.getElementById("score");
 const remainingElement = document.getElementById("remaining");
 const startMessage = document.getElementById("startMessage");
 const startButton = document.getElementById("startButton");
@@ -18,27 +20,184 @@ const backgroundMusic = document.getElementById("backgroundMusic");
 const screamerAudio = document.getElementById("screamerAudio");
 const screamerOverlay = document.getElementById("screamerOverlay");
 
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
-const TOTAL_CREATURES = 25;
+const WIDTH = 960;
+const HEIGHT = 540;
+const TARGET_CREATURES = 25;
+
+canvas.width = WIDTH;
+canvas.height = HEIGHT;
+
+let score = 0;
+let gameStarted = false;
+let gameRunning = false;
+let musicEnabled = false;
+let animationFrame = null;
+let lastFrameTime = 0;
+let nextScreamerTime = 0;
+let screamerActive = false;
+let screamerTimeout = null;
+let lastScreamerAt = 0;
 
 let creatures = [];
 let particles = [];
-let graves = [];
-let trees = [];
-let clouds = [];
+let backgroundImage = new Image();
+let backgroundLoaded = false;
 
-let gameStarted = false;
-let animationId = null;
-let musicEnabled = false;
-let screamerTimeout = null;
-let screamerActive = false;
-let lastTime = 0;
-let elapsedTime = 0;
+// =====================================================
+// FONDO DEL CEMENTERIO
+// =====================================================
 
-// =============================================
+backgroundImage.src = "cementerio.png";
+
+backgroundImage.onload = () => {
+    backgroundLoaded = true;
+};
+
+backgroundImage.onerror = () => {
+    backgroundLoaded = false;
+    console.warn(
+        "No se encontró cementerio.png. Se utilizará el fondo dibujado."
+    );
+};
+
+function drawBackground() {
+    if (backgroundLoaded) {
+        const imageRatio = backgroundImage.width / backgroundImage.height;
+        const canvasRatio = WIDTH / HEIGHT;
+
+        let drawWidth;
+        let drawHeight;
+        let offsetX;
+        let offsetY;
+
+        if (imageRatio > canvasRatio) {
+            drawHeight = HEIGHT;
+            drawWidth = HEIGHT * imageRatio;
+            offsetX = (WIDTH - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            drawWidth = WIDTH;
+            drawHeight = WIDTH / imageRatio;
+            offsetX = 0;
+            offsetY = (HEIGHT - drawHeight) / 2;
+        }
+
+        ctx.drawImage(
+            backgroundImage,
+            offsetX,
+            offsetY,
+            drawWidth,
+            drawHeight
+        );
+
+        // Oscurecer el fondo para dar ambiente nocturno.
+        ctx.fillStyle = "rgba(8, 6, 24, 0.43)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    } else {
+        drawFallbackBackground();
+    }
+
+    drawFog();
+    drawVignette();
+}
+
+function drawFallbackBackground() {
+    const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+    gradient.addColorStop(0, "#11152c");
+    gradient.addColorStop(0.55, "#28203a");
+    gradient.addColorStop(1, "#080b13");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    // Luna
+    ctx.fillStyle = "#ded9ef";
+    ctx.beginPath();
+    ctx.arc(775, 92, 37, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#bcb4d8";
+    ctx.beginPath();
+    ctx.arc(790, 80, 33, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Estrellas
+    for (let i = 0; i < 45; i++) {
+        const x = (i * 137 + 43) % WIDTH;
+        const y = (i * 61 + 17) % 250;
+
+        ctx.fillStyle = i % 3 === 0 ? "#e5c9ff" : "#aaa9d2";
+        ctx.fillRect(x, y, i % 4 === 0 ? 3 : 2, i % 4 === 0 ? 3 : 2);
+    }
+
+    // Siluetas de árboles.
+    for (let i = 0; i < 9; i++) {
+        const x = i * 125 + 10;
+        const treeHeight = 130 + (i % 3) * 28;
+
+        ctx.fillStyle = "#11131e";
+        ctx.fillRect(x, HEIGHT - treeHeight, 12, treeHeight);
+
+        ctx.beginPath();
+        ctx.moveTo(x - 42, HEIGHT - treeHeight + 65);
+        ctx.lineTo(x + 6, HEIGHT - treeHeight - 25);
+        ctx.lineTo(x + 51, HEIGHT - treeHeight + 65);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // Suelo
+    ctx.fillStyle = "#171b24";
+    ctx.fillRect(0, 390, WIDTH, 150);
+
+    // Lápidas
+    for (let i = 0; i < 8; i++) {
+        const x = i * 132 + 20;
+        const y = 410 + (i % 2) * 30;
+
+        ctx.fillStyle = "#3c3d50";
+        ctx.fillRect(x, y, 48, 70);
+        ctx.fillRect(x + 8, y - 10, 32, 10);
+
+        ctx.fillStyle = "#5b5b70";
+        ctx.fillRect(x + 7, y + 9, 3, 42);
+
+        ctx.fillStyle = "#9691ae";
+        ctx.fillRect(x + 18, y + 17, 12, 3);
+        ctx.fillRect(x + 22, y + 13, 4, 12);
+    }
+}
+
+function drawFog() {
+    const fog = ctx.createLinearGradient(0, 360, 0, HEIGHT);
+    fog.addColorStop(0, "rgba(119, 111, 163, 0)");
+    fog.addColorStop(0.55, "rgba(113, 103, 145, 0.09)");
+    fog.addColorStop(1, "rgba(151, 129, 174, 0.13)");
+
+    ctx.fillStyle = fog;
+    ctx.fillRect(0, 330, WIDTH, 210);
+}
+
+function drawVignette() {
+    const gradient = ctx.createRadialGradient(
+        WIDTH / 2,
+        HEIGHT / 2,
+        80,
+        WIDTH / 2,
+        HEIGHT / 2,
+        610
+    );
+
+    gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+    gradient.addColorStop(1, "rgba(0, 0, 8, 0.48)");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+}
+
+// =====================================================
 // UTILIDADES
-// =============================================
+// =====================================================
 
 function random(min, max) {
     return Math.random() * (max - min) + min;
@@ -48,333 +207,177 @@ function randomInt(min, max) {
     return Math.floor(random(min, max + 1));
 }
 
-function choose(array) {
-    return array[Math.floor(Math.random() * array.length)];
+function distanceBetween(a, b) {
+    return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
+function updateScore() {
+    scoreElement.textContent = score;
+    remainingElement.textContent = creatures.filter(
+        creature => !creature.squashing && !creature.dead
+    ).length;
 }
 
-// =============================================
-// ESCENARIO PIXEL ART
-// =============================================
+// =====================================================
+// PARTÍCULAS MÁGICAS
+// =====================================================
 
-function createScenery() {
-    graves = [];
-    trees = [];
-    clouds = [];
-
-    // Tumbas
-    for (let i = 0; i < 24; i++) {
-        graves.push({
-            x: random(15, WIDTH - 40),
-            y: random(315, HEIGHT - 35),
-            width: randomInt(17, 30),
-            height: randomInt(24, 39),
-            color: choose(["#454257", "#514b63", "#393849"]),
-            cross: Math.random() > 0.65
-        });
-    }
-
-    // Árboles oscuros
-    for (let i = 0; i < 10; i++) {
-        trees.push({
-            x: random(-10, WIDTH),
-            y: random(115, 285),
-            size: randomInt(30, 60)
-        });
-    }
-
-    // Nubes
-    for (let i = 0; i < 5; i++) {
-        clouds.push({
-            x: random(0, WIDTH),
-            y: random(25, 125),
-            width: randomInt(60, 130),
-            speed: random(2, 7)
-        });
-    }
-}
-
-function drawPixelRect(x, y, w, h, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-}
-
-function drawBackground() {
-    // Cielo nocturno
-    const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-    sky.addColorStop(0, "#090b20");
-    sky.addColorStop(0.45, "#17162f");
-    sky.addColorStop(1, "#292039");
-
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-    // Luna
-    drawPixelRect(748, 48, 76, 76, "#d7d2e7");
-    drawPixelRect(760, 36, 52, 12, "#d7d2e7");
-    drawPixelRect(760, 124, 52, 12, "#d7d2e7");
-    drawPixelRect(724, 60, 24, 52, "#d7d2e7");
-    drawPixelRect(824, 60, 12, 52, "#d7d2e7");
-
-    // Cráteres
-    drawPixelRect(773, 61, 12, 12, "#aaa6c5");
-    drawPixelRect(796, 89, 10, 10, "#aaa6c5");
-    drawPixelRect(761, 103, 8, 8, "#aaa6c5");
-
-    // Estrellas
-    for (let i = 0; i < 48; i++) {
-        const x = (i * 137 + 43) % WIDTH;
-        const y = (i * 67 + 17) % 180;
-        const size = i % 5 === 0 ? 4 : 2;
-
-        drawPixelRect(
-            x,
-            y,
-            size,
-            size,
-            i % 3 === 0 ? "#f8c8ff" : "#d4e9ff"
-        );
-    }
-
-    // Nubes
-    clouds.forEach(cloud => {
-        drawPixelRect(cloud.x, cloud.y, cloud.width, 14, "#24223d");
-        drawPixelRect(cloud.x + 12, cloud.y - 9, cloud.width * 0.55, 12, "#24223d");
-        drawPixelRect(cloud.x + 8, cloud.y + 14, cloud.width * 0.7, 5, "#1a1930");
-    });
-
-    // Montañas lejanas
-    ctx.fillStyle = "#17182c";
-    ctx.beginPath();
-    ctx.moveTo(0, 235);
-    ctx.lineTo(110, 145);
-    ctx.lineTo(200, 230);
-    ctx.lineTo(340, 155);
-    ctx.lineTo(460, 238);
-    ctx.lineTo(600, 165);
-    ctx.lineTo(720, 230);
-    ctx.lineTo(850, 150);
-    ctx.lineTo(WIDTH, 230);
-    ctx.lineTo(WIDTH, HEIGHT);
-    ctx.lineTo(0, HEIGHT);
-    ctx.closePath();
-    ctx.fill();
-
-    // Siluetas de árboles
-    trees.forEach(tree => {
-        const s = tree.size;
-        const x = tree.x;
-        const y = tree.y;
-
-        drawPixelRect(x + s * 0.4, y + s * 0.5, s * 0.2, s, "#100e20");
-
-        drawPixelRect(x, y + s * 0.15, s, s * 0.3, "#100e20");
-        drawPixelRect(x + s * 0.15, y, s * 0.7, s * 0.25, "#100e20");
-        drawPixelRect(x - s * 0.1, y + s * 0.3, s * 0.55, s * 0.25, "#100e20");
-        drawPixelRect(x + s * 0.55, y + s * 0.3, s * 0.55, s * 0.25, "#100e20");
-    });
-
-    // Suelo del cementerio
-    drawPixelRect(0, 295, WIDTH, HEIGHT - 295, "#292238");
-    drawPixelRect(0, 295, WIDTH, 6, "#45405a");
-
-    // Camino
-    ctx.fillStyle = "#353047";
-    ctx.beginPath();
-    ctx.moveTo(410, 295);
-    ctx.lineTo(560, 295);
-    ctx.lineTo(770, HEIGHT);
-    ctx.lineTo(200, HEIGHT);
-    ctx.closePath();
-    ctx.fill();
-
-    // Pasto pixelado
-    for (let i = 0; i < 150; i++) {
-        const x = (i * 79) % WIDTH;
-        const y = 307 + ((i * 47) % (HEIGHT - 307));
-
-        drawPixelRect(
-            x,
-            y,
-            3,
-            5,
-            i % 2 === 0 ? "#435244" : "#343d42"
-        );
-    }
-
-    // Tumbas
-    graves
-        .slice()
-        .sort((a, b) => a.y - b.y)
-        .forEach(grave => {
-            drawGrave(grave);
-        });
-
-    // Charcos oscuros
-    drawPixelRect(95, 466, 72, 7, "#211b35");
-    drawPixelRect(104, 473, 54, 4, "#4c405c");
-    drawPixelRect(790, 365, 65, 6, "#211b35");
-
-    // Viñeta oscura en las orillas
-    const vignette = ctx.createRadialGradient(
-        WIDTH / 2, HEIGHT / 2, 110,
-        WIDTH / 2, HEIGHT / 2, 570
-    );
-
-    vignette.addColorStop(0, "transparent");
-    vignette.addColorStop(1, "#03020bba");
-
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-}
-
-function drawGrave(grave) {
-    const { x, y, width: w, height: h, color, cross } = grave;
-
-    // Sombra
-    drawPixelRect(x - 4, y + h - 2, w + 8, 6, "#171322");
-
-    // Base
-    drawPixelRect(x - 3, y + h - 6, w + 6, 7, "#242033");
-
-    // Lápida
-    drawPixelRect(x, y + 7, w, h - 7, color);
-    drawPixelRect(x + 4, y, w - 8, 9, color);
-
-    // Iluminación lateral
-    drawPixelRect(x + 3, y + 9, 3, h - 17, "#777084");
-    drawPixelRect(x + 7, y + 13, w - 14, 2, "#625a73");
-
-    // Cruz
-    if (cross) {
-        drawPixelRect(x + w / 2 - 2, y + 12, 4, 13, "#c5a9d6");
-        drawPixelRect(x + w / 2 - 6, y + 16, 12, 3, "#c5a9d6");
-    } else {
-        drawPixelRect(x + 7, y + 15, w - 14, 3, "#a69bb6");
-    }
-}
-
-// =============================================
-// CLASE CRIATURA
-// =============================================
-
-class Creature {
-    constructor(type, x, y, size, speedX, speedY) {
-        this.type = type;
+class Particle {
+    constructor(x, y, color) {
         this.x = x;
         this.y = y;
-        this.size = size;
+        this.color = color;
+        this.vx = random(-2.4, 2.4);
+        this.vy = random(-3, 1.2);
+        this.life = random(18, 38);
+        this.maxLife = this.life;
+        this.size = randomInt(2, 5);
+    }
 
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.035;
+        this.life--;
+    }
+
+    draw() {
+        if (this.life <= 0) return;
+
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(
+            Math.round(this.x),
+            Math.round(this.y),
+            this.size,
+            this.size
+        );
+        ctx.globalAlpha = 1;
+    }
+}
+
+function createParticles(x, y, color, amount = 12) {
+    for (let i = 0; i < amount; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+// =====================================================
+// CRIATURAS
+// =====================================================
+
+const CREATURE_TYPES = ["ghost", "pumpkin", "bat", "zombie", "cat"];
+
+const PALETTES = {
+    ghost: ["#e8e1ff", "#d7ccf6", "#fff0f8", "#bba7e8"],
+    pumpkin: ["#f59a45", "#ffb957", "#dc6b37", "#ffcf76"],
+    bat: ["#7566a7", "#a99ad9", "#53466e", "#d8c6ff"],
+    zombie: ["#80a96d", "#a4c58a", "#4b6e4c", "#c5d9a5"],
+    cat: ["#d5a1c4", "#f2c4dc", "#a976b0", "#f9d9e9"]
+};
+
+class Creature {
+    constructor(x, y, type, size, color, speedX, speedY) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.size = size;
+        this.color = color;
         this.speedX = speedX;
         this.speedY = speedY;
 
-        this.baseSpeedX = speedX;
-        this.baseSpeedY = speedY;
-
-        this.alive = true;
-        this.squash = 1;
+        this.radius = size * 0.53;
+        this.squashing = false;
         this.squashTimer = 0;
-        this.flashTimer = 0;
-        this.bounceTimer = 0;
-        this.phase = random(0, Math.PI * 2);
-        this.rotation = 0;
-
-        this.color = this.getColor();
-        this.collisionCooldown = 0;
-    }
-
-    getColor() {
-        const colors = {
-            ghost: "#e5e8ff",
-            pumpkin: "#ff9a43",
-            bat: "#a88bea",
-            zombie: "#85c98b",
-            cat: "#c6a5dc"
-        };
-
-        return colors[this.type];
+        this.dead = false;
+        this.animationOffset = random(0, Math.PI * 2);
+        this.blinkTimer = randomInt(100, 260);
+        this.blinking = false;
+        this.hitFlash = 0;
     }
 
     update(delta) {
-        if (!this.alive) return;
+        if (this.dead) return;
 
-        const dt = Math.min(delta / 16.67, 2);
-
-        this.phase += 0.045 * dt;
-
-        if (this.squashTimer > 0) {
+        if (this.squashing) {
             this.squashTimer -= delta;
-            this.squash = Math.max(0.55, this.squash - 0.025 * dt);
-        } else {
-            this.squash += (1 - this.squash) * 0.18;
+
+            if (this.squashTimer <= 0) {
+                this.dead = true;
+            }
+            return;
         }
 
-        if (this.flashTimer > 0) {
-            this.flashTimer -= delta;
-        }
+        const step = delta / 16.67;
 
-        if (this.bounceTimer > 0) {
-            this.bounceTimer -= delta;
-        }
+        this.x += this.speedX * step;
+        this.y += this.speedY * step;
 
-        if (this.collisionCooldown > 0) {
-            this.collisionCooldown -= delta;
-        }
-
-        this.x += this.speedX * dt;
-        this.y += this.speedY * dt;
-
-        const r = this.size * 0.5;
-
-        // Rebote horizontal
-        if (this.x - r < 4) {
-            this.x = r + 4;
+        // Mantener a las criaturas dentro del área de juego.
+        if (this.x - this.radius < 0) {
+            this.x = this.radius;
             this.speedX = Math.abs(this.speedX);
-        } else if (this.x + r > WIDTH - 4) {
-            this.x = WIDTH - r - 4;
+        }
+
+        if (this.x + this.radius > WIDTH) {
+            this.x = WIDTH - this.radius;
             this.speedX = -Math.abs(this.speedX);
         }
 
-        // Rebote vertical: se mantiene dentro del cementerio
-        if (this.y - r < 150) {
-            this.y = 150 + r;
+        if (this.y - this.radius < 145) {
+            this.y = 145 + this.radius;
             this.speedY = Math.abs(this.speedY);
-        } else if (this.y + r > HEIGHT - 12) {
-            this.y = HEIGHT - r - 12;
+        }
+
+        if (this.y + this.radius > HEIGHT - 25) {
+            this.y = HEIGHT - 25 - this.radius;
             this.speedY = -Math.abs(this.speedY);
+        }
+
+        this.blinkTimer -= step;
+
+        if (this.blinkTimer <= 0) {
+            this.blinking = !this.blinking;
+            this.blinkTimer = this.blinking ? 7 : randomInt(90, 230);
+        }
+
+        if (this.hitFlash > 0) {
+            this.hitFlash -= step;
         }
     }
 
     draw() {
-        if (!this.alive) return;
+        if (this.dead) return;
 
         ctx.save();
         ctx.translate(Math.round(this.x), Math.round(this.y));
 
-        // Aplastar: ancho mayor y altura menor
-        const squashX = 1 + (1 - this.squash) * 0.65;
-        const squashY = this.squash;
+        const bob = this.squashing ? 0 : Math.sin(
+            performance.now() * 0.003 + this.animationOffset
+        ) * 1.4;
+
+        ctx.translate(0, bob);
+
+        let squashX = 1;
+        let squashY = 1;
+
+        if (this.squashing) {
+            const progress = Math.max(0, this.squashTimer / 240);
+            squashX = 1 + (1 - progress) * 0.48;
+            squashY = 0.15 + progress * 0.85;
+        }
 
         ctx.scale(squashX, squashY);
 
-        // Sombra
-        ctx.fillStyle = "#08060e99";
-        ctx.fillRect(-this.size * 0.4, this.size * 0.35, this.size * 0.8, 5);
+        // Sombra de la criatura.
+        ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
+        ctx.fillRect(
+            -this.size * 0.43,
+            this.size * 0.39,
+            this.size * 0.86,
+            this.size * 0.18
+        );
 
-        if (this.flashTimer > 0) {
-            ctx.shadowColor = "#9cffd0";
-            ctx.shadowBlur = 14;
-        }
-
-        this.drawSprite();
-
-        ctx.restore();
-    }
-
-    drawSprite() {
         switch (this.type) {
             case "ghost":
                 this.drawGhost();
@@ -392,366 +395,559 @@ class Creature {
                 this.drawCat();
                 break;
         }
+
+        // Destello al chocar.
+        if (this.hitFlash > 0) {
+            ctx.globalAlpha = Math.min(0.45, this.hitFlash * 0.1);
+            ctx.fillStyle = "#9defff";
+            ctx.fillRect(
+                -this.size * 0.5,
+                -this.size * 0.5,
+                this.size,
+                this.size
+            );
+        }
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
     }
+
+    // -------------------------------------------------
+    // FANTASMA
+    // -------------------------------------------------
 
     drawGhost() {
-        const s = this.size;
-        const w = s * 0.72;
-        const h = s * 0.85;
+        const u = this.size / 12;
 
-        // Aura
-        ctx.fillStyle = "#aebaff24";
-        ctx.fillRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
+        ctx.fillStyle = "#9d8ec9";
+        ctx.fillRect(-4 * u, -4 * u, 8 * u, 7 * u);
 
-        // Cuerpo
-        ctx.fillStyle = this.flashTimer > 0 ? "#9cffd0" : "#dfe5ff";
-        ctx.fillRect(-w / 2, -h / 2 + 5, w, h - 8);
-        ctx.fillRect(-w / 2 + 4, -h / 2, w - 8, h - 3);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-4.5 * u, -4.3 * u, 9 * u, 6.8 * u);
+        ctx.fillRect(-5 * u, -2.1 * u, 1.2 * u, 2.3 * u);
+        ctx.fillRect(3.8 * u, -2.1 * u, 1.2 * u, 2.3 * u);
 
-        // Ondulaciones inferiores
-        ctx.fillRect(-w / 2, h / 2 - 5, w * 0.25, 6);
-        ctx.fillRect(-w / 2 + w * 0.42, h / 2 - 5, w * 0.25, 6);
-        ctx.fillRect(w / 2 - 6, h / 2 - 5, 6, 6);
+        // Parte inferior ondulada.
+        ctx.fillStyle = "#d7c9f6";
+        ctx.fillRect(-4.5 * u, 2 * u, 2 * u, 1 * u);
+        ctx.fillRect(-1 * u, 2 * u, 2 * u, 1 * u);
+        ctx.fillRect(2.5 * u, 2 * u, 2 * u, 1 * u);
 
-        // Sombreado
-        ctx.fillStyle = "#a5b1d8";
-        ctx.fillRect(-w / 2 + 3, -h / 2 + 8, 4, h * 0.55);
+        // Mejillas.
+        ctx.fillStyle = "#f8a9cb";
+        ctx.fillRect(-3.3 * u, -0.4 * u, 1.1 * u, 0.7 * u);
+        ctx.fillRect(2.2 * u, -0.4 * u, 1.1 * u, 0.7 * u);
 
-        // Ojos
-        ctx.fillStyle = "#25213b";
-        ctx.fillRect(-w * 0.27, -h * 0.15, 5, 8);
-        ctx.fillRect(w * 0.08, -h * 0.15, 5, 8);
+        // Ojos.
+        ctx.fillStyle = "#342647";
+        if (!this.blinking) {
+            ctx.fillRect(-2.7 * u, -2.2 * u, 1.3 * u, 1.8 * u);
+            ctx.fillRect(1.5 * u, -2.2 * u, 1.3 * u, 1.8 * u);
 
-        // Boca
-        ctx.fillStyle = "#514568";
-        ctx.fillRect(-3, h * 0.12, 6, 6);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-2.3 * u, -1.9 * u, 0.4 * u, 0.4 * u);
+            ctx.fillRect(1.9 * u, -1.9 * u, 0.4 * u, 0.4 * u);
+        } else {
+            ctx.fillRect(-2.7 * u, -1.6 * u, 1.3 * u, 0.3 * u);
+            ctx.fillRect(1.5 * u, -1.6 * u, 1.3 * u, 0.3 * u);
+        }
 
-        // Brillo
+        // Boca.
+        ctx.fillStyle = "#55364e";
+        ctx.fillRect(-0.8 * u, 0.1 * u, 1.6 * u, 1.1 * u);
+
+        // Moñito.
+        ctx.fillStyle = "#ec91c9";
+        ctx.fillRect(-1 * u, -4.9 * u, 1 * u, 1 * u);
+        ctx.fillRect(0, -4.9 * u, 1 * u, 1 * u);
+        ctx.fillRect(-0.2 * u, -4.6 * u, 0.5 * u, 0.5 * u);
+
+        // Brillo de la cabeza.
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(-w / 2 + 6, -h / 2 + 5, 4, 4);
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(-2.8 * u, -3.5 * u, 1.1 * u, 0.4 * u);
+        ctx.globalAlpha = 1;
     }
+
+    // -------------------------------------------------
+    // CALABAZA
+    // -------------------------------------------------
 
     drawPumpkin() {
-        const s = this.size;
-        const w = s * 0.86;
-        const h = s * 0.7;
+        const u = this.size / 12;
 
-        // Tallo
-        ctx.fillStyle = "#64834e";
-        ctx.fillRect(-4, -h / 2 - 7, 8, 10);
-        ctx.fillRect(0, -h / 2 - 8, 7, 4);
+        // Tallo.
+        ctx.fillStyle = "#567f49";
+        ctx.fillRect(-0.9 * u, -5.5 * u, 1.8 * u, 2 * u);
+        ctx.fillRect(-0.2 * u, -6 * u, 1.1 * u, 1 * u);
 
-        // Cuerpo
-        ctx.fillStyle = this.flashTimer > 0 ? "#9cffd0" : "#e87b32";
-        ctx.fillRect(-w / 2 + 5, -h / 2, w - 10, h);
-        ctx.fillRect(-w / 2, -h / 2 + 6, w, h - 12);
-        ctx.fillRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+        // Cuerpo y segmentos.
+        ctx.fillStyle = "#bd622f";
+        ctx.fillRect(-4.6 * u, -3.8 * u, 9.2 * u, 7.2 * u);
 
-        // Segmentos
-        ctx.fillStyle = "#b95228";
-        ctx.fillRect(-w * 0.27, -h / 2 + 4, 4, h - 8);
-        ctx.fillRect(w * 0.22, -h / 2 + 4, 4, h - 8);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-3.8 * u, -4.3 * u, 7.6 * u, 7.1 * u);
+        ctx.fillRect(-4.7 * u, -2.5 * u, 1.2 * u, 4.3 * u);
+        ctx.fillRect(3.5 * u, -2.5 * u, 1.2 * u, 4.3 * u);
 
-        // Cara
-        ctx.fillStyle = "#382039";
-        ctx.fillRect(-w * 0.3, -h * 0.15, 8, 8);
-        ctx.fillRect(w * 0.12, -h * 0.15, 8, 8);
-        ctx.fillRect(-w * 0.1, h * 0.12, 7, 8);
-        ctx.fillRect(0, h * 0.22, 9, 4);
+        ctx.fillStyle = "#ffc86c";
+        ctx.fillRect(-2.6 * u, -3.7 * u, 1 * u, 5.8 * u);
+        ctx.fillRect(1.6 * u, -3.7 * u, 1 * u, 5.8 * u);
 
-        // Luz
-        ctx.fillStyle = "#ffca6b";
-        ctx.fillRect(-w * 0.31, -h * 0.2, 3, 3);
+        // Ojos triangulares.
+        ctx.fillStyle = "#ffef9a";
+        ctx.beginPath();
+        ctx.moveTo(-3 * u, -2 * u);
+        ctx.lineTo(-1 * u, -1 * u);
+        ctx.lineTo(-3 * u, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(3 * u, -2 * u);
+        ctx.lineTo(1 * u, -1 * u);
+        ctx.lineTo(3 * u, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Boca sonriente.
+        ctx.fillStyle = "#4a2631";
+        ctx.fillRect(-2.7 * u, 0.8 * u, 5.4 * u, 1.3 * u);
+        ctx.fillRect(-1.9 * u, 0.2 * u, 1 * u, 0.7 * u);
+        ctx.fillRect(0.9 * u, 0.2 * u, 1 * u, 0.7 * u);
+
+        ctx.fillStyle = "#fff0b5";
+        ctx.fillRect(-1.2 * u, 0.8 * u, 0.8 * u, 0.5 * u);
+        ctx.fillRect(0.5 * u, 0.8 * u, 0.8 * u, 0.5 * u);
     }
+
+    // -------------------------------------------------
+    // MURCIÉLAGO
+    // -------------------------------------------------
 
     drawBat() {
-        const s = this.size;
-        const wing = Math.sin(this.phase * 5) * 5;
+        const u = this.size / 12;
 
-        // Alas
-        ctx.fillStyle = "#66508c";
-        ctx.fillRect(-s / 2, -5 + wing, s * 0.32, s * 0.38);
-        ctx.fillRect(-s / 2 - 5, 0 + wing, s * 0.2, s * 0.28);
-        ctx.fillRect(s * 0.18, -5 - wing, s * 0.32, s * 0.38);
-        ctx.fillRect(s * 0.3, 0 - wing, s * 0.2, s * 0.28);
+        // Alas.
+        ctx.fillStyle = "#332b4e";
 
-        // Cuerpo
-        ctx.fillStyle = this.flashTimer > 0 ? "#9cffd0" : "#8e75c5";
-        ctx.fillRect(-s * 0.18, -s * 0.2, s * 0.36, s * 0.48);
-        ctx.fillRect(-s * 0.24, -s * 0.1, s * 0.48, s * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(-1 * u, -1 * u);
+        ctx.lineTo(-6 * u, -4 * u);
+        ctx.lineTo(-5 * u, -1 * u);
+        ctx.lineTo(-6 * u, 2 * u);
+        ctx.lineTo(-2 * u, 1.5 * u);
+        ctx.closePath();
+        ctx.fill();
 
-        // Orejas
-        ctx.fillStyle = "#8e75c5";
-        ctx.fillRect(-s * 0.19, -s * 0.3, 5, 9);
-        ctx.fillRect(s * 0.08, -s * 0.3, 5, 9);
+        ctx.beginPath();
+        ctx.moveTo(1 * u, -1 * u);
+        ctx.lineTo(6 * u, -4 * u);
+        ctx.lineTo(5 * u, -1 * u);
+        ctx.lineTo(6 * u, 2 * u);
+        ctx.lineTo(2 * u, 1.5 * u);
+        ctx.closePath();
+        ctx.fill();
 
-        // Ojos
-        ctx.fillStyle = "#ff9acb";
-        ctx.fillRect(-s * 0.13, -s * 0.04, 4, 4);
-        ctx.fillRect(s * 0.05, -s * 0.04, 4, 4);
+        // Interior de las alas.
+        ctx.fillStyle = "#8e6ca9";
+        ctx.fillRect(-4.7 * u, -1.8 * u, 1.2 * u, 2.3 * u);
+        ctx.fillRect(3.5 * u, -1.8 * u, 1.2 * u, 2.3 * u);
+
+        // Orejas.
+        ctx.fillStyle = "#403255";
+        ctx.fillRect(-3.5 * u, -5.5 * u, 1.5 * u, 3 * u);
+        ctx.fillRect(2 * u, -5.5 * u, 1.5 * u, 3 * u);
+
+        ctx.fillStyle = "#b98cc9";
+        ctx.fillRect(-3 * u, -4.8 * u, 0.5 * u, 1.4 * u);
+        ctx.fillRect(2.5 * u, -4.8 * u, 0.5 * u, 1.4 * u);
+
+        // Cabeza.
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-3.8 * u, -3.7 * u, 7.6 * u, 5.7 * u);
+
+        // Mejillas.
+        ctx.fillStyle = "#e89cce";
+        ctx.fillRect(-3 * u, 0.2 * u, 1.2 * u, 0.7 * u);
+        ctx.fillRect(1.8 * u, 0.2 * u, 1.2 * u, 0.7 * u);
+
+        // Ojos.
+        ctx.fillStyle = "#f7f0ff";
+        ctx.fillRect(-2.5 * u, -2.2 * u, 1.5 * u, 1.5 * u);
+        ctx.fillRect(1 * u, -2.2 * u, 1.5 * u, 1.5 * u);
+
+        ctx.fillStyle = "#d35c9c";
+        ctx.fillRect(-2 * u, -1.8 * u, 0.8 * u, 0.9 * u);
+        ctx.fillRect(1.3 * u, -1.8 * u, 0.8 * u, 0.9 * u);
+
+        // Colmillitos.
+        ctx.fillStyle = "#fff1ed";
+        ctx.fillRect(-1.8 * u, 1 * u, 0.7 * u, 1.2 * u);
+        ctx.fillRect(1.1 * u, 1 * u, 0.7 * u, 1.2 * u);
     }
+
+    // -------------------------------------------------
+    // ZOMBI DETALLADO
+    // -------------------------------------------------
 
     drawZombie() {
-        const s = this.size;
-        const w = s * 0.68;
-        const h = s * 0.75;
+        const u = this.size / 12;
 
-        // Brazos
-        ctx.fillStyle = "#669e70";
-        ctx.fillRect(-w / 2 - 8, -2, 10, 5);
-        ctx.fillRect(w / 2 - 1, -4, 10, 5);
+        // Zapatos.
+        ctx.fillStyle = "#20222b";
+        ctx.fillRect(-3.8 * u, 4.6 * u, 3.1 * u, 1.1 * u);
+        ctx.fillRect(0.7 * u, 4.6 * u, 3.1 * u, 1.1 * u);
 
-        // Cuerpo
-        ctx.fillStyle = "#668b63";
-        ctx.fillRect(-w / 2, -h / 2 + 10, w, h - 8);
+        // Piernas.
+        ctx.fillStyle = "#353e3c";
+        ctx.fillRect(-3 * u, 2.1 * u, 2 * u, 3 * u);
+        ctx.fillRect(1 * u, 2.1 * u, 2 * u, 3 * u);
 
-        // Cabeza
-        ctx.fillStyle = this.flashTimer > 0 ? "#9cffd0" : "#8fc48b";
-        ctx.fillRect(-w / 2 + 2, -h / 2, w - 4, h * 0.52);
+        // Pantalón rasgado.
+        ctx.fillStyle = "#566b53";
+        ctx.fillRect(-3 * u, 2.8 * u, 2 * u, 1.2 * u);
+        ctx.fillRect(1 * u, 2.8 * u, 2 * u, 1.2 * u);
 
-        // Cabello
-        ctx.fillStyle = "#303441";
-        ctx.fillRect(-w / 2 + 1, -h / 2, w - 2, 6);
-        ctx.fillRect(-w / 2 + 4, -h / 2 - 4, 7, 6);
+        ctx.fillStyle = "#293b33";
+        ctx.fillRect(-2.6 * u, 3.7 * u, 1.1 * u, 0.5 * u);
+        ctx.fillRect(1.6 * u, 3.5 * u, 0.9 * u, 0.8 * u);
 
-        // Ojos desiguales
-        ctx.fillStyle = "#29233b";
-        ctx.fillRect(-w * 0.25, -h * 0.15, 5, 6);
-        ctx.fillRect(w * 0.1, -h * 0.12, 5, 5);
+        // Brazos largos.
+        ctx.fillStyle = "#739767";
+        ctx.fillRect(-4.7 * u, -1 * u, 1.5 * u, 3.6 * u);
+        ctx.fillRect(3.2 * u, -1 * u, 1.5 * u, 3.6 * u);
 
-        ctx.fillStyle = "#e5b9d7";
-        ctx.fillRect(-w * 0.23, -h * 0.13, 2, 2);
+        // Manos.
+        ctx.fillStyle = "#a0bd81";
+        ctx.fillRect(-5 * u, 1.9 * u, 1.8 * u, 1.2 * u);
+        ctx.fillRect(3.3 * u, 1.9 * u, 1.8 * u, 1.2 * u);
 
-        // Boca
-        ctx.fillStyle = "#35233b";
-        ctx.fillRect(-w * 0.18, h * 0.05, w * 0.38, 6);
+        // Dedos cuadrados.
+        ctx.fillRect(-5.1 * u, 2.7 * u, 0.5 * u, 1 * u);
+        ctx.fillRect(-4.1 * u, 2.7 * u, 0.5 * u, 1 * u);
+        ctx.fillRect(3.6 * u, 2.7 * u, 0.5 * u, 1 * u);
+        ctx.fillRect(4.6 * u, 2.7 * u, 0.5 * u, 1 * u);
 
-        // Ropa rota
-        ctx.fillStyle = "#444b69";
-        ctx.fillRect(-w / 2, h * 0.25, w, 7);
-        ctx.fillRect(-w / 2 + 7, h * 0.4, 5, 6);
+        // Camiseta vieja.
+        ctx.fillStyle = "#5a4764";
+        ctx.fillRect(-3.5 * u, -1.6 * u, 7 * u, 4.4 * u);
+
+        // Parches de la ropa.
+        ctx.fillStyle = "#352d43";
+        ctx.fillRect(-3.3 * u, 0.6 * u, 2.1 * u, 1.8 * u);
+        ctx.fillRect(1.5 * u, -0.7 * u, 1.5 * u, 2.4 * u);
+
+        ctx.fillStyle = "#b6a3bd";
+        ctx.fillRect(-2.7 * u, 1 * u, 1.1 * u, 0.4 * u);
+        ctx.fillRect(-2.2 * u, 1.4 * u, 0.4 * u, 0.8 * u);
+
+        // Cuello.
+        ctx.fillStyle = "#759a68";
+        ctx.fillRect(-1.3 * u, -2.7 * u, 2.6 * u, 1.4 * u);
+
+        // Orejas.
+        ctx.fillStyle = "#6e9366";
+        ctx.fillRect(-4 * u, -5.2 * u, 1.2 * u, 2.1 * u);
+        ctx.fillRect(2.8 * u, -5.2 * u, 1.2 * u, 2.1 * u);
+
+        // Cabeza y sombras.
+        ctx.fillStyle = "#456346";
+        ctx.fillRect(-3.8 * u, -7 * u, 7.6 * u, 7 * u);
+
+        ctx.fillStyle = "#83a975";
+        ctx.fillRect(-3.1 * u, -6.5 * u, 5.9 * u, 5.5 * u);
+
+        ctx.fillStyle = "#648b5d";
+        ctx.fillRect(-3.5 * u, -2.1 * u, 2 * u, 1 * u);
+        ctx.fillRect(1.6 * u, -6 * u, 1.1 * u, 2.2 * u);
+
+        // Pelo despeinado.
+        ctx.fillStyle = "#202a27";
+        ctx.fillRect(-4 * u, -7.5 * u, 2 * u, 1.4 * u);
+        ctx.fillRect(-2.7 * u, -8.4 * u, 2.1 * u, 1.7 * u);
+        ctx.fillRect(-0.8 * u, -7.8 * u, 2 * u, 1.2 * u);
+        ctx.fillRect(1.1 * u, -8.3 * u, 2.4 * u, 1.5 * u);
+        ctx.fillRect(3 * u, -7.3 * u, 1.1 * u, 1.3 * u);
+
+        ctx.fillStyle = "#46534a";
+        ctx.fillRect(-2.3 * u, -7.9 * u, 1.1 * u, 0.5 * u);
+        ctx.fillRect(1.8 * u, -7.7 * u, 1 * u, 0.5 * u);
+
+        // Cuencas.
+        ctx.fillStyle = "#354634";
+        ctx.fillRect(-2.8 * u, -5.4 * u, 2.3 * u, 2.1 * u);
+        ctx.fillRect(0.7 * u, -5.4 * u, 2.3 * u, 2.1 * u);
+
+        // Ojos amarillos y rojos.
+        ctx.fillStyle = "#f9efb4";
+        if (!this.blinking) {
+            ctx.fillRect(-2.4 * u, -5 * u, 1.5 * u, 1.4 * u);
+            ctx.fillRect(1.1 * u, -5 * u, 1.5 * u, 1.4 * u);
+
+            ctx.fillStyle = "#d74752";
+            ctx.fillRect(-1.9 * u, -4.7 * u, 0.8 * u, 0.9 * u);
+            ctx.fillRect(1.5 * u, -4.7 * u, 0.8 * u, 0.9 * u);
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-2.1 * u, -4.9 * u, 0.4 * u, 0.4 * u);
+            ctx.fillRect(1.4 * u, -4.9 * u, 0.4 * u, 0.4 * u);
+        } else {
+            ctx.fillStyle = "#263329";
+            ctx.fillRect(-2.5 * u, -4.3 * u, 1.7 * u, 0.3 * u);
+            ctx.fillRect(1.1 * u, -4.3 * u, 1.7 * u, 0.3 * u);
+        }
+
+        // Cejas.
+        ctx.fillStyle = "#2a3529";
+        ctx.fillRect(-2.9 * u, -5.9 * u, 2.4 * u, 0.5 * u);
+        ctx.fillRect(0.7 * u, -5.6 * u, 2.4 * u, 0.5 * u);
+
+        // Nariz.
+        ctx.fillStyle = "#52764e";
+        ctx.fillRect(-0.6 * u, -3.8 * u, 1.2 * u, 1.1 * u);
+
+        // Boca abierta.
+        ctx.fillStyle = "#241820";
+        ctx.fillRect(-2.1 * u, -2.7 * u, 4.2 * u, 1.7 * u);
+
+        // Dientes.
+        ctx.fillStyle = "#eee6cf";
+        ctx.fillRect(-1.6 * u, -2.7 * u, 1 * u, 0.6 * u);
+        ctx.fillRect(0.4 * u, -2.7 * u, 1 * u, 0.6 * u);
+        ctx.fillRect(-0.6 * u, -1.5 * u, 1 * u, 0.5 * u);
+
+        // Cicatriz.
+        ctx.fillStyle = "#a74750";
+        ctx.fillRect(1.8 * u, -6.4 * u, 0.5 * u, 1.1 * u);
+        ctx.fillRect(1.2 * u, -5.8 * u, 1.5 * u, 0.4 * u);
+
+        // Herida de la mejilla.
+        ctx.fillStyle = "#b94f5c";
+        ctx.fillRect(-3.1 * u, -2.4 * u, 0.7 * u, 0.9 * u);
+
+        // Botones de la camiseta.
+        ctx.fillStyle = "#d6c28a";
+        ctx.fillRect(-0.3 * u, -0.4 * u, 0.6 * u, 0.6 * u);
+        ctx.fillRect(-0.3 * u, 0.9 * u, 0.6 * u, 0.6 * u);
+
+        // Contorno pixelado.
+        ctx.strokeStyle = "#253327";
+        ctx.lineWidth = Math.max(1, u * 0.4);
+        ctx.strokeRect(-3.8 * u, -7 * u, 7.6 * u, 7 * u);
     }
+
+    // -------------------------------------------------
+    // GATITO FANTASMAL
+    // -------------------------------------------------
 
     drawCat() {
-        const s = this.size;
-        const w = s * 0.7;
-        const h = s * 0.7;
+        const u = this.size / 12;
 
-        // Orejas
-        ctx.fillStyle = "#a989b9";
-        ctx.fillRect(-w / 2, -h / 2, 10, 13);
-        ctx.fillRect(w / 2 - 10, -h / 2, 10, 13);
+        // Orejas.
+        ctx.fillStyle = "#7b5b86";
+        ctx.fillRect(-4 * u, -5.6 * u, 2.4 * u, 3.5 * u);
+        ctx.fillRect(1.6 * u, -5.6 * u, 2.4 * u, 3.5 * u);
 
-        // Interior de orejas
-        ctx.fillStyle = "#e5a0c7";
-        ctx.fillRect(-w / 2 + 3, -h / 2 + 4, 4, 5);
-        ctx.fillRect(w / 2 - 7, -h / 2 + 4, 4, 5);
+        ctx.fillStyle = "#f0a3c8";
+        ctx.fillRect(-3.3 * u, -4.9 * u, 1.1 * u, 1.9 * u);
+        ctx.fillRect(2.2 * u, -4.9 * u, 1.1 * u, 1.9 * u);
 
-        // Cabeza
-        ctx.fillStyle = this.flashTimer > 0 ? "#9cffd0" : "#a989b9";
-        ctx.fillRect(-w / 2, -h / 2 + 7, w, h * 0.68);
+        // Cuerpo.
+        ctx.fillStyle = "#8d6b99";
+        ctx.fillRect(-3.7 * u, -2.5 * u, 7.4 * u, 5.5 * u);
 
-        // Mejillas
-        ctx.fillStyle = "#d4b5df";
-        ctx.fillRect(-w / 2 + 3, h * 0.05, 8, 6);
-        ctx.fillRect(w / 2 - 11, h * 0.05, 8, 6);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-4 * u, -3 * u, 8 * u, 5.3 * u);
 
-        // Ojos
-        ctx.fillStyle = "#c7ffb2";
-        ctx.fillRect(-w * 0.28, -h * 0.08, 6, 8);
-        ctx.fillRect(w * 0.1, -h * 0.08, 6, 8);
+        // Patitas.
+        ctx.fillStyle = "#b98bbd";
+        ctx.fillRect(-3.5 * u, 1.8 * u, 2 * u, 1.8 * u);
+        ctx.fillRect(1.5 * u, 1.8 * u, 2 * u, 1.8 * u);
 
-        ctx.fillStyle = "#242039";
-        ctx.fillRect(-w * 0.23, -h * 0.05, 2, 6);
-        ctx.fillRect(w * 0.15, -h * 0.05, 2, 6);
+        // Cola.
+        ctx.fillStyle = "#b88bc2";
+        ctx.fillRect(3.1 * u, 1.4 * u, 1.5 * u, 1 * u);
+        ctx.fillRect(4.1 * u, 0.1 * u, 1.1 * u, 1.7 * u);
+        ctx.fillRect(3.5 * u, -0.4 * u, 1.5 * u, 0.9 * u);
 
-        // Nariz y boca
-        ctx.fillStyle = "#ff8dbd";
-        ctx.fillRect(-2, h * 0.13, 4, 3);
+        // Mejillas.
+        ctx.fillStyle = "#f7a8cf";
+        ctx.fillRect(-3 * u, -0.1 * u, 1.2 * u, 0.8 * u);
+        ctx.fillRect(1.8 * u, -0.1 * u, 1.2 * u, 0.8 * u);
 
-        ctx.fillStyle = "#44304e";
-        ctx.fillRect(-5, h * 0.2, 3, 4);
-        ctx.fillRect(2, h * 0.2, 3, 4);
+        // Ojos.
+        if (!this.blinking) {
+            ctx.fillStyle = "#eaffb2";
+            ctx.fillRect(-2.5 * u, -2.1 * u, 1.6 * u, 1.7 * u);
+            ctx.fillRect(0.9 * u, -2.1 * u, 1.6 * u, 1.7 * u);
 
-        // Bigotes
-        ctx.fillRect(-w / 2 - 4, h * 0.1, 8, 2);
-        ctx.fillRect(w / 2 - 4, h * 0.1, 8, 2);
-    }
+            ctx.fillStyle = "#55364e";
+            ctx.fillRect(-1.9 * u, -2.1 * u, 0.5 * u, 1.7 * u);
+            ctx.fillRect(1.5 * u, -2.1 * u, 0.5 * u, 1.7 * u);
 
-    squashOnCollision() {
-        this.squash = 0.58;
-        this.squashTimer = 180;
-        this.flashTimer = 220;
-        this.bounceTimer = 180;
-    }
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-2.2 * u, -2 * u, 0.4 * u, 0.4 * u);
+            ctx.fillRect(1.2 * u, -2 * u, 0.4 * u, 0.4 * u);
+        } else {
+            ctx.fillStyle = "#55364e";
+            ctx.fillRect(-2.5 * u, -1.4 * u, 1.6 * u, 0.3 * u);
+            ctx.fillRect(0.9 * u, -1.4 * u, 1.6 * u, 0.3 * u);
+        }
 
-    containsPoint(x, y) {
-        const half = this.size * 0.65;
+        // Nariz.
+        ctx.fillStyle = "#f5a4c8";
+        ctx.fillRect(-0.4 * u, -0.4 * u, 0.8 * u, 0.6 * u);
 
-        return this.alive &&
-            x >= this.x - half &&
-            x <= this.x + half &&
-            y >= this.y - half &&
-            y <= this.y + half;
+        // Boca.
+        ctx.fillStyle = "#68435e";
+        ctx.fillRect(-0.8 * u, 0.3 * u, 0.5 * u, 0.5 * u);
+        ctx.fillRect(0.3 * u, 0.3 * u, 0.5 * u, 0.5 * u);
+        ctx.fillRect(-0.2 * u, 0.7 * u, 0.5 * u, 0.5 * u);
+
+        // Bigotes.
+        ctx.fillStyle = "#f7e9ff";
+        ctx.fillRect(-4.1 * u, -0.2 * u, 1.5 * u, 0.2 * u);
+        ctx.fillRect(-4.1 * u, 0.6 * u, 1.5 * u, 0.2 * u);
+        ctx.fillRect(2.6 * u, -0.2 * u, 1.5 * u, 0.2 * u);
+        ctx.fillRect(2.6 * u, 0.6 * u, 1.5 * u, 0.2 * u);
+
+        // Collar y campanita.
+        ctx.fillStyle = "#f5c56d";
+        ctx.fillRect(-2.6 * u, 1.1 * u, 5.2 * u, 0.5 * u);
+        ctx.fillStyle = "#ffe8a4";
+        ctx.fillRect(-0.3 * u, 1.5 * u, 0.6 * u, 0.6 * u);
     }
 }
 
-// =============================================
-// CREAR CRIATURAS
-// =============================================
+// =====================================================
+// CREACIÓN Y REPOSICIÓN DE CRIATURAS
+// =====================================================
 
-function createCreatures() {
+function createCreature() {
+    const type = CREATURE_TYPES[randomInt(0, CREATURE_TYPES.length - 1)];
+    const palette = PALETTES[type];
+    const size = randomInt(16, 24);
+
+    const x = random(size + 10, WIDTH - size - 10);
+    const y = random(170, HEIGHT - size - 35);
+
+    let speedX = random(-1.25, 1.25);
+    let speedY = random(-0.95, 0.95);
+
+    if (Math.abs(speedX) < 0.35) {
+        speedX = speedX < 0 ? -0.45 : 0.45;
+    }
+
+    if (Math.abs(speedY) < 0.25) {
+        speedY = speedY < 0 ? -0.35 : 0.35;
+    }
+
+    return new Creature(
+        x,
+        y,
+        type,
+        size,
+        palette[randomInt(0, palette.length - 1)],
+        speedX,
+        speedY
+    );
+}
+
+function maintainCreatures() {
+    creatures = creatures.filter(creature => !creature.dead);
+
+    while (
+        creatures.filter(
+            creature => !creature.squashing && !creature.dead
+        ).length < TARGET_CREATURES
+    ) {
+        creatures.push(createCreature());
+    }
+
+    updateScore();
+}
+
+function resetCreatures() {
     creatures = [];
+    particles = [];
 
-    const types = [
-        "ghost", "ghost", "ghost", "ghost", "ghost",
-        "pumpkin", "pumpkin", "pumpkin", "pumpkin", "pumpkin",
-        "bat", "bat", "bat", "bat", "bat",
-        "zombie", "zombie", "zombie", "zombie", "zombie",
-        "cat", "cat", "cat", "cat", "cat"
-    ];
-
-    types.forEach(type => {
-        const size = randomInt(23, 34);
-
-        creatures.push(
-            new Creature(
-                type,
-                random(45, WIDTH - 45),
-                random(180, HEIGHT - 35),
-                size,
-                random(-2.1, 2.1) || 1,
-                random(-1.8, 1.8) || 1
-            )
-        );
-    });
-
-    remainingElement.textContent = creatures.length;
-}
-
-// =============================================
-// PARTÍCULAS PIXEL
-// =============================================
-
-function createParticles(x, y, color, amount = 10) {
-    for (let i = 0; i < amount; i++) {
-        particles.push({
-            x,
-            y,
-            vx: random(-3, 3),
-            vy: random(-4, 1),
-            size: randomInt(2, 5),
-            life: randomInt(250, 550),
-            maxLife: 550,
-            color
-        });
+    for (let i = 0; i < TARGET_CREATURES; i++) {
+        creatures.push(createCreature());
     }
+
+    // Separar las criaturas al iniciar para reducir superposiciones.
+    for (let pass = 0; pass < 5; pass++) {
+        handleCollisions(true);
+    }
+
+    updateScore();
 }
 
-function updateParticles(delta) {
-    const dt = Math.min(delta / 16.67, 2);
+// =====================================================
+// COLISIONES Y REBOTES
+// =====================================================
 
-    particles.forEach(p => {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy += 0.08 * dt;
-        p.life -= delta;
-    });
-
-    particles = particles.filter(p => p.life > 0);
-}
-
-function drawParticles() {
-    particles.forEach(p => {
-        ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
-    });
-
-    ctx.globalAlpha = 1;
-}
-
-// =============================================
-// COLISIONES Y APLASTAMIENTO
-// =============================================
-
-function handleCollisions() {
+function handleCollisions(separatingOnly = false) {
     for (let i = 0; i < creatures.length; i++) {
         const a = creatures[i];
 
-        if (!a.alive) continue;
+        if (a.dead || a.squashing) continue;
 
         for (let j = i + 1; j < creatures.length; j++) {
             const b = creatures[j];
 
-            if (!b.alive) continue;
+            if (b.dead || b.squashing) continue;
 
-            const dx = b.x - a.x;
-            const dy = b.y - a.y;
-            const distance = Math.hypot(dx, dy);
-            const minDistance = (a.size + b.size) * 0.43;
+            let dx = b.x - a.x;
+            let dy = b.y - a.y;
+            let distance = Math.hypot(dx, dy);
 
-            if (distance < minDistance) {
-                // Evitar que queden completamente superpuestas
-                const nx = distance === 0 ? 1 : dx / distance;
-                const ny = distance === 0 ? 0 : dy / distance;
-                const overlap = minDistance - distance;
+            const minimumDistance = a.radius + b.radius;
 
-                a.x -= nx * overlap * 0.5;
-                a.y -= ny * overlap * 0.5;
-                b.x += nx * overlap * 0.5;
-                b.y += ny * overlap * 0.5;
+            if (distance >= minimumDistance) continue;
 
-                // Intercambio de velocidad en la dirección del choque
-                const relativeX = a.speedX - b.speedX;
-                const relativeY = a.speedY - b.speedY;
-                const approaching = relativeX * nx + relativeY * ny;
-
-                if (approaching > 0) {
-                    a.speedX -= approaching * nx * 0.85;
-                    a.speedY -= approaching * ny * 0.85;
-                    b.speedX += approaching * nx * 0.85;
-                    b.speedY += approaching * ny * 0.85;
-                } else {
-                    // Separar suavemente cuando se mueven en direcciones parecidas
-                    a.speedX -= nx * 0.3;
-                    a.speedY -= ny * 0.3;
-                    b.speedX += nx * 0.3;
-                    b.speedY += ny * 0.3;
-                }
-
-                // Efecto de aplastamiento en ambos personajes
-                if (a.collisionCooldown <= 0 || b.collisionCooldown <= 0) {
-                    a.squashOnCollision();
-                    b.squashOnCollision();
-
-                    a.collisionCooldown = 160;
-                    b.collisionCooldown = 160;
-
-                    createParticles(
-                        (a.x + b.x) / 2,
-                        (a.y + b.y) / 2,
-                        "#9cffd0",
-                        5
-                    );
-                }
-
-                // Evitar que la velocidad se vuelva demasiado pequeña
-                if (Math.abs(a.speedX) < 0.5) {
-                    a.speedX = a.speedX < 0 ? -0.8 : 0.8;
-                }
-
-                if (Math.abs(b.speedX) < 0.5) {
-                    b.speedX = b.speedX < 0 ? -0.8 : 0.8;
-                }
+            if (distance === 0) {
+                dx = 0.01;
+                dy = 0.01;
+                distance = Math.hypot(dx, dy);
             }
+
+            const nx = dx / distance;
+            const ny = dy / distance;
+            const overlap = minimumDistance - distance;
+
+            // Separar las criaturas para que no queden pegadas.
+            a.x -= nx * overlap * 0.5;
+            a.y -= ny * overlap * 0.5;
+            b.x += nx * overlap * 0.5;
+            b.y += ny * overlap * 0.5;
+
+            if (separatingOnly) continue;
+
+            // Colisión elástica aproximada entre masas iguales.
+            const relativeX = a.speedX - b.speedX;
+            const relativeY = a.speedY - b.speedY;
+            const closingSpeed = relativeX * nx + relativeY * ny;
+
+            if (closingSpeed > 0) {
+                a.speedX -= closingSpeed * nx;
+                a.speedY -= closingSpeed * ny;
+
+                b.speedX += closingSpeed * nx;
+                b.speedY += closingSpeed * ny;
+            }
+
+            // Destello azul breve al tocarse.
+            a.hitFlash = 4;
+            b.hitFlash = 4;
         }
     }
 }
 
-// =============================================
-// CAPTURAR CRIATURAS CON EL RATÓN
-// =============================================
+// =====================================================
+// INTERACCIÓN CON EL RATÓN
+// =====================================================
 
 function getCanvasPosition(event) {
     const rect = canvas.getBoundingClientRect();
@@ -763,123 +959,130 @@ function getCanvasPosition(event) {
 }
 
 canvas.addEventListener("click", event => {
-    if (!gameStarted || screamerActive) return;
+    if (!gameRunning || screamerActive) return;
 
     const position = getCanvasPosition(event);
 
-    // Primero se comprueba la criatura visualmente más cercana al frente
+    // Comprobar primero las criaturas más cercanas al frente.
     for (let i = creatures.length - 1; i >= 0; i--) {
         const creature = creatures[i];
 
-        if (creature.containsPoint(position.x, position.y)) {
-            creature.alive = false;
+        if (creature.dead || creature.squashing) continue;
 
+        const distance = Math.hypot(
+            position.x - creature.x,
+            position.y - creature.y
+        );
+
+        if (distance <= creature.radius * 1.6) {
+            creature.squashing = true;
+            creature.squashTimer = 240;
+
+            score++;
             createParticles(
                 creature.x,
                 creature.y,
-                creature.color,
+                PALETTES[creature.type][0],
                 18
             );
 
-            remainingElement.textContent =
-                creatures.filter(c => c.alive).length;
-
-            gameStatus.textContent = "¡CRIATURA CAPTURADA!";
-
-            if (creatures.every(c => !c.alive)) {
-                finishGame();
-            } else {
-                setTimeout(() => {
-                    if (gameStarted && !screamerActive) {
-                        gameStatus.textContent = "SIGUE EXPLORANDO...";
-                    }
-                }, 800);
-            }
+            updateScore();
+            gameStatus.textContent = "¡Has capturado un alma! ✨";
 
             break;
         }
     }
 });
 
-// =============================================
+// =====================================================
 // SCREAMER
-// =============================================
+// =====================================================
 
-function scheduleScreamer() {
-    clearTimeout(screamerTimeout);
-
-    if (!gameStarted) return;
-
-    // Aparición aleatoria entre 35 y 60 segundos
-    const delay = randomInt(35000, 60000);
-
-    screamerTimeout = setTimeout(() => {
-        if (gameStarted) {
-            showScreamer();
-        }
-    }, delay);
+function scheduleNextScreamer() {
+    // Próximo susto aleatorio entre 20 y 35 segundos.
+    nextScreamerTime = performance.now() + random(20000, 35000);
 }
 
-function showScreamer() {
-    if (!gameStarted || screamerActive) return;
+function triggerScreamer() {
+    if (!gameRunning || screamerActive) return;
 
+    const now = performance.now();
+
+    // Evitar que se active varias veces seguidas.
+    if (now - lastScreamerAt < 8000) {
+        scheduleNextScreamer();
+        return;
+    }
+
+    lastScreamerAt = now;
     screamerActive = true;
-    screamerOverlay.classList.add("active");
+
+    screamerOverlay.classList.remove("active");
     screamerOverlay.setAttribute("aria-hidden", "false");
 
-    try {
+    // Reiniciar animación CSS.
+    void screamerOverlay.offsetWidth;
+    screamerOverlay.classList.add("active");
+
+    if (screamerAudio) {
+        screamerAudio.pause();
         screamerAudio.currentTime = 0;
         screamerAudio.volume = 1;
 
-        const playback = screamerAudio.play();
+        screamerAudio.play().catch(() => {
+            console.warn(
+                "El navegador no permitió reproducir el grito automáticamente."
+            );
+        });
+    }
 
-        if (playback && typeof playback.catch === "function") {
-            playback.catch(() => {
-                // El juego continúa aunque el navegador bloquee el audio
-            });
+    gameStatus.textContent = "¡ALGO TE HA ENCONTRADO!";
+
+    clearTimeout(screamerTimeout);
+
+    screamerTimeout = setTimeout(() => {
+        screamerOverlay.classList.remove("active");
+        screamerOverlay.setAttribute("aria-hidden", "true");
+
+        if (screamerAudio) {
+            screamerAudio.pause();
+            screamerAudio.currentTime = 0;
         }
-    } catch (error) {
-        console.warn("No se pudo reproducir el screamer.", error);
-    }
 
-    setTimeout(() => {
-        hideScreamer();
-    }, 1600);
+        screamerActive = false;
+
+        if (gameRunning) {
+            gameStatus.textContent = "No estás a salvo...";
+            scheduleNextScreamer();
+        }
+    }, 1100);
 }
 
-function hideScreamer() {
-    screamerOverlay.classList.remove("active");
-    screamerOverlay.setAttribute("aria-hidden", "true");
-    screamerActive = false;
-
-    if (gameStarted) {
-        scheduleScreamer();
-    }
-}
-
-// =============================================
+// =====================================================
 // MÚSICA AMBIENTAL
-// =============================================
+// =====================================================
 
 async function toggleMusic() {
+    if (!backgroundMusic) return;
+
     if (musicEnabled) {
         backgroundMusic.pause();
         musicEnabled = false;
-        musicButton.textContent = "♫ ACTIVAR MÚSICA";
+        musicButton.textContent = "♫ Activar música";
         return;
     }
 
     try {
+        backgroundMusic.volume = 0.45;
         await backgroundMusic.play();
 
         musicEnabled = true;
-        musicButton.textContent = "♫ SILENCIAR MÚSICA";
+        musicButton.textContent = "♫ Silenciar música";
     } catch (error) {
         musicEnabled = false;
-        musicButton.textContent = "♫ INTENTAR DE NUEVO";
-
+        musicButton.textContent = "♫ Reintentar música";
         console.warn(
-            "No se pudo reproducir la música. Comprueba el archivo de audio.",
+            "No se pudo reproducir la música. Revisa audio/terror.mp3.",
             error
         );
     }
@@ -887,165 +1090,148 @@ async function toggleMusic() {
 
 musicButton.addEventListener("click", toggleMusic);
 
-// =============================================
-// BUCLE PRINCIPAL
-// =============================================
-
-function update(delta) {
-    if (!gameStarted || screamerActive) return;
-
-    elapsedTime += delta;
-
-    // Movimiento de nubes
-    clouds.forEach(cloud => {
-        cloud.x += cloud.speed * delta / 1000;
-
-        if (cloud.x > WIDTH + cloud.width) {
-            cloud.x = -cloud.width;
-        }
-    });
-
-    creatures.forEach(creature => creature.update(delta));
-
-    handleCollisions();
-    updateParticles(delta);
-}
-
-function render() {
-    drawBackground();
-
-    // Ordenar por profundidad: las criaturas de abajo aparecen delante
-    const orderedCreatures = creatures
-        .filter(c => c.alive)
-        .slice()
-        .sort((a, b) => a.y - b.y);
-
-    orderedCreatures.forEach(creature => creature.draw());
-
-    drawParticles();
-
-    if (gameStarted && !screamerActive) {
-        drawCrosshair();
-    }
-}
-
-function drawCrosshair() {
-    // Pequeño destello decorativo en el centro del escenario
-    // El cursor real del navegador permanece funcional.
-}
-
-function gameLoop(timestamp) {
-    if (!gameStarted) return;
-
-    const delta = lastTime === 0
-        ? 16.67
-        : Math.min(timestamp - lastTime, 50);
-
-    lastTime = timestamp;
-
-    update(delta);
-    render();
-
-    animationId = requestAnimationFrame(gameLoop);
-}
-
-// =============================================
-// INICIAR, TERMINAR Y REINICIAR
-// =============================================
+// =====================================================
+// INICIO, PAUSA Y REINICIO
+// =====================================================
 
 function startGame() {
-    if (gameStarted) return;
+    if (gameRunning) return;
 
     gameStarted = true;
+    gameRunning = true;
+
     startMessage.classList.add("hidden");
+    startMessage.setAttribute("aria-hidden", "true");
 
-    lastTime = 0;
-    elapsedTime = 0;
+    startButton.textContent = "Entrar al cementerio";
 
-    gameStatus.textContent = "SOBREVIVE A LA NOCHE";
+    gameStatus.textContent = "Las criaturas están despiertas...";
+    lastFrameTime = performance.now();
 
-    createCreatures();
-    particles = [];
+    scheduleNextScreamer();
 
-    cancelAnimationFrame(animationId);
-    animationId = requestAnimationFrame(gameLoop);
+    if (!musicEnabled) {
+        toggleMusic();
+    }
 
-    scheduleScreamer();
-}
+    if (animationFrame !== null) {
+        cancelAnimationFrame(animationFrame);
+    }
 
-function finishGame() {
-    gameStarted = false;
-
-    cancelAnimationFrame(animationId);
-    clearTimeout(screamerTimeout);
-
-    gameStatus.textContent = "¡CEMENTERIO LIMPIO!";
-
-    render();
-
-    startMessage.classList.remove("hidden");
-
-    startMessage.querySelector("h2").textContent =
-        "¡LO LOGRASTE!";
-
-    startMessage.querySelector("p").textContent =
-        "Has capturado a todas las criaturas.";
-
-    startMessage.querySelector(".small-instruction").textContent =
-        "Pero algo sigue escondido en la oscuridad...";
-
-    startButton.textContent = "JUGAR DE NUEVO";
+    animationFrame = requestAnimationFrame(gameLoop);
 }
 
 function restartGame() {
+    gameRunning = false;
     gameStarted = false;
-    screamerActive = false;
 
-    cancelAnimationFrame(animationId);
+    if (animationFrame !== null) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+    }
+
     clearTimeout(screamerTimeout);
+
+    screamerActive = false;
 
     screamerOverlay.classList.remove("active");
     screamerOverlay.setAttribute("aria-hidden", "true");
 
-    screamerAudio.pause();
-    screamerAudio.currentTime = 0;
+    if (screamerAudio) {
+        screamerAudio.pause();
+        screamerAudio.currentTime = 0;
+    }
 
-    // La música se conserva en su estado actual.
-    creatures = [];
-    particles = [];
+    if (backgroundMusic) {
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+    }
 
-    createScenery();
-    createCreatures();
+    musicEnabled = false;
+    musicButton.textContent = "♫ Activar música";
 
+    score = 0;
+    resetCreatures();
+
+    // Limpiar el canvas antes de volver a mostrar el menú.
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    drawBackground();
+    creatures.forEach(creature => creature.draw());
+
+    gameStatus.textContent = "Esperando la medianoche...";
+    startButton.textContent = "✦ Entrar al cementerio";
+
+    // Restablecer la pantalla centrada.
     startMessage.classList.remove("hidden");
-
-    startMessage.querySelector("h2").textContent =
-        "¡BIENVENIDA AL CEMENTERIO!";
-
-    startMessage.querySelector("p").textContent =
-        "Encuentra a las criaturas y haz clic sobre ellas.";
-
-    startMessage.querySelector(".small-instruction").textContent =
-        "Ten cuidado... algo te observa desde la oscuridad.";
-
-    startButton.textContent = "COMENZAR JUEGO";
-    gameStatus.textContent = "PREPARA TU VARITA";
-
-    lastTime = 0;
-    render();
+    startMessage.style.display = "";
+    startMessage.setAttribute("aria-hidden", "false");
 }
 
-startButton.addEventListener("click", startGame);
+startButton.addEventListener("click", () => {
+    if (!gameRunning) {
+        startGame();
+    }
+});
+
 restartButton.addEventListener("click", restartGame);
 
-// =============================================
+// =====================================================
+// BUCLE PRINCIPAL
+// =====================================================
+
+function gameLoop(timestamp) {
+    if (!gameRunning) return;
+
+    const delta = Math.min(timestamp - lastFrameTime || 16.67, 40);
+    lastFrameTime = timestamp;
+
+    drawBackground();
+
+    if (!screamerActive) {
+        for (const creature of creatures) {
+            creature.update(delta);
+        }
+
+        handleCollisions();
+
+        for (const creature of creatures) {
+            creature.draw();
+        }
+
+        for (const particle of particles) {
+            particle.update();
+            particle.draw();
+        }
+
+        particles = particles.filter(particle => particle.life > 0);
+
+        maintainCreatures();
+
+        if (timestamp >= nextScreamerTime) {
+            triggerScreamer();
+        }
+    }
+
+    animationFrame = requestAnimationFrame(gameLoop);
+}
+
+// =====================================================
 // INICIALIZACIÓN
-// =============================================
+// =====================================================
 
 function initializeGame() {
-    createScenery();
-    createCreatures();
-    render();
+    resetCreatures();
+
+    drawBackground();
+
+    for (const creature of creatures) {
+        creature.draw();
+    }
+
+    startMessage.classList.remove("hidden");
+    startMessage.setAttribute("aria-hidden", "false");
+
+    gameStatus.textContent = "Esperando la medianoche...";
 }
 
 initializeGame();

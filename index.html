@@ -3,88 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cementerio Pixel | Cazafantasmas</title>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          rel="stylesheet">
+    <title>Cementerio Pixel | Noche de terror</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
     <main class="game-container">
-        <header class="game-header">
-            <div class="title-decoration">✦ ☾ ✦</div>
-            <h1>CEMENTERIO <span>PIXEL</span></h1>
-            <p class="subtitle">Una noche llena de criaturas extrañas...</p>
-        </header>
+        <canvas id="gameCanvas" aria-label="Juego de terror Cementerio Pixel"></canvas>
 
-        <section class="game-panel">
-            <div class="game-toolbar">
-                <div class="counter">
-                    <span class="counter-icon">👻</span>
-                    Criaturas:
+        <header class="hud">
+            <div class="brand">
+                <span class="brand-icon">☾</span>
+                <div>
+                    <h1>Cementerio Pixel</h1>
+                    <p>NO DESPIERTES A LOS MUERTOS</p>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-label">ALMAS</span>
+                    <strong id="score">0</strong>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">CRIATURAS</span>
                     <strong id="remaining">25</strong>
                 </div>
-
-                <div class="game-status" id="gameStatus">
-                    PREPARA TU VARITA
-                </div>
             </div>
+        </header>
 
-            <div class="canvas-frame">
-                <canvas id="gameCanvas" width="960" height="540">
-                    Tu navegador no admite Canvas.
-                </canvas>
+        <div class="game-status" id="gameStatus">Esperando la medianoche...</div>
 
-                <div id="startMessage" class="start-overlay">
-                    <div class="start-card">
-                        <div class="start-ghost">👻</div>
-                        <h2>¡BIENVENIDA AL CEMENTERIO!</h2>
-                        <p>Encuentra a las criaturas y haz clic sobre ellas.</p>
-                        <p class="small-instruction">
-                            Ten cuidado... algo te observa desde la oscuridad.
-                        </p>
-                        <button id="startButton" class="pixel-button">
-                            COMENZAR JUEGO
-                        </button>
-                    </div>
+        <div class="controls">
+            <button id="musicButton" class="control-button" type="button">
+                ♫ Activar música
+            </button>
+            <button id="restartButton" class="control-button" type="button">
+                ↻ Reiniciar
+            </button>
+        </div>
+
+        <section id="startMessage" class="start-overlay">
+            <div class="intro-card">
+                <div class="moon-decoration">☾</div>
+                <p class="eyebrow">UNA NOCHE EN EL CEMENTERIO</p>
+                <h2>Cementerio <span>Pixel</span></h2>
+                <p class="intro-description">
+                    Las criaturas han despertado. Toca a los pequeños monstruos
+                    para capturar sus almas, pero ten cuidado con los sustos.
+                </p>
+                <div class="intro-details">
+                    <span>✦ 25 criaturas</span>
+                    <span>✦ Encuentros extraños</span>
+                    <span>✦ Sustos inesperados</span>
                 </div>
-
-                <div id="screamerOverlay" class="screamer-overlay"
-                     aria-hidden="true">
-                    <div class="screamer-art" id="screamerArt"></div>
-                    <div class="screamer-text">¡TE ENCONTRÉ!</div>
-                </div>
-            </div>
-
-            <div class="game-controls">
-                <button id="musicButton" class="pixel-button secondary">
-                    ♫ ACTIVAR MÚSICA
+                <button id="startButton" class="start-button" type="button">
+                    <span>✦</span> Entrar al cementerio
                 </button>
-
-                <button id="restartButton" class="pixel-button">
-                    ↻ REINICIAR
-                </button>
-            </div>
-
-            <div class="game-help">
-                <span>🪄 Haz clic en las criaturas para atraparlas.</span>
-                <span>☠ No confíes en el silencio...</span>
+                <p class="small-note">Se recomienda activar el sonido</p>
             </div>
         </section>
 
-        <footer class="game-footer">
-            <span>✦ PIXEL HORROR ✦</span>
-            <span>Explora bajo tu propio riesgo</span>
+        <div id="screamerOverlay" class="screamer-overlay" aria-hidden="true">
+            <div class="screamer-face">
+                <div class="screamer-hair"></div>
+                <div class="screamer-eyes">
+                    <div class="screamer-eye"><span></span></div>
+                    <div class="screamer-eye"><span></span></div>
+                </div>
+                <div class="screamer-nose"></div>
+                <div class="screamer-mouth">
+                    <div class="teeth top-teeth"></div>
+                    <div class="mouth-dark"></div>
+                    <div class="teeth bottom-teeth"></div>
+                </div>
+                <div class="screamer-scar"></div>
+            </div>
+            <div class="screamer-text">¡TE ENCONTRÉ!</div>
+        </div>
+
+        <footer class="footer">
+            <span>☠</span> NO CONFÍES EN LO QUE SE MUEVE EN LA OSCURIDAD
+            <span>☠</span>
         </footer>
+
+        <audio id="backgroundMusic" src="audio/terror.mp3" loop preload="auto"></audio>
+        <audio id="screamerAudio" src="audio/screamer.mp3" preload="auto"></audio>
     </main>
-
-    <!-- Archivos de audio locales -->
-    <audio id="backgroundMusic" src="audio/terror.mp3"
-           loop preload="auto"></audio>
-
-    <audio id="screamerAudio" src="audio/screamer.mp3"
-           preload="auto"></audio>
 
     <script src="script.js"></script>
 </body>
